@@ -234,7 +234,8 @@ const Settings = () => {
                         />
                       ) : profile.profileImage ? (
                         <img 
-                          src={profile.profileImage.startsWith('http') ? profile.profileImage : `http://localhost:5000/${profile.profileImage}`} 
+                          src={profile.profileImage.startsWith('http') ? profile.profileImage :
+                             `https://campus-backend-3axn.onrender.com/${profile.profileImage}`} 
                           alt={user?.fullName} 
                           className="w-full h-full object-cover"
                           onError={(e) => {

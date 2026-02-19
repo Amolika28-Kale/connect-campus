@@ -106,11 +106,15 @@ const Sidebar = () => {
     if (imagePath.includes('uploads/')) {
       // Extract just the filename if it's a full path
       const filename = imagePath.split('uploads/').pop();
-      return `http://localhost:5000/uploads/${filename}`;
+      // return `http://localhost:5000/uploads/${filename}`;
+            return `https://campus-backend-3axn.onrender.com/uploads/${filename}`;
+
     }
     
     // If it's just a filename
-    return `http://localhost:5000/uploads/profiles/${imagePath}`;
+    // return `http://localhost:5000/uploads/profiles/${imagePath}`;
+        return `https://campus-backend-3axn.onrender.com/uploads/profiles/${imagePath}`;
+
   };
 
   // Logout Modal Component
