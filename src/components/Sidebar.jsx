@@ -161,48 +161,49 @@ const Sidebar = () => {
               <h1 className="text-2xl font-black bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">
                 PuneDate
               </h1>
-              <p className="text-xs text-gray-400">Find your Pune connection 💕</p>
+              <p className="text-xs text-gray-400">Find your Pune connection💕</p>
             </div>
           </div>
 
           {/* User Profile Card with Photo */}
-          {user && (
-            <div className="mb-6 p-4 bg-gradient-to-r from-pink-50 to-purple-50 rounded-2xl border border-pink-100 hover:shadow-lg transition-all group">
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-pink-300 group-hover:border-pink-500 transition-all shadow-md bg-gradient-to-r from-pink-100 to-purple-100">
-                    {profileImageUrl && !imageError ? (
-                      <img 
-                        src={profileImageUrl} 
-                        alt={user.fullName}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          console.log("Image load error for:", profileImageUrl);
-                          setImageError(true);
-                        }}
-                        onLoad={() => console.log("Image loaded successfully:", profileImageUrl)}
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-r from-pink-400 to-purple-500 flex items-center justify-center text-white font-bold text-xl">
-                        {user.fullName?.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                  </div>
-                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
-                </div>
-                
-                <div className="flex-1">
-                  <p className="font-semibold text-gray-800 group-hover:text-pink-600 transition-colors">
-                    {user.fullName}
-                  </p>
-                  <p className="text-xs text-gray-500 flex items-center gap-1">
-                    <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                    Online
-                  </p>
-                </div>
-              </div>
+{/* User Profile Card with Photo */}
+{user && (
+  <div className="mb-6 p-4 bg-gradient-to-r from-pink-50 to-purple-50 rounded-2xl border border-pink-100 hover:shadow-lg transition-all group">
+    <div className="flex items-center gap-3">
+      <div className="relative">
+        <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-pink-300 group-hover:border-pink-500 transition-all shadow-md bg-gradient-to-r from-pink-100 to-purple-100">
+          {user.profileImage ? (
+            <img 
+              src={user.profileImage} 
+              alt={user.fullName}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                console.log("Image load error, using fallback");
+                e.target.style.display = 'none';
+                e.target.parentElement.innerHTML = `<div class="w-full h-full bg-gradient-to-r from-pink-400 to-purple-500 flex items-center justify-center text-white font-bold text-xl">${user.fullName?.charAt(0).toUpperCase()}</div>`;
+              }}
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-r from-pink-400 to-purple-500 flex items-center justify-center text-white font-bold text-xl">
+              {user.fullName?.charAt(0).toUpperCase()}
             </div>
           )}
+        </div>
+        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
+      </div>
+      
+      <div className="flex-1">
+        <p className="font-semibold text-gray-800 group-hover:text-pink-600 transition-colors">
+          {user.fullName}
+        </p>
+        <p className="text-xs text-gray-500 flex items-center gap-1">
+          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+          Online
+        </p>
+      </div>
+    </div>
+  </div>
+)}
 
           {/* Navigation Links */}
           <nav className="space-y-2">
@@ -300,13 +301,7 @@ const Sidebar = () => {
         ))}
       </div>
 
-      {/* Mobile Logout Button */}
-      <button
-        onClick={() => setShowLogoutModal(true)}
-        className="md:hidden fixed bottom-20 right-4 w-12 h-12 bg-gradient-to-r from-red-500 to-pink-500 rounded-full flex items-center justify-center text-white shadow-xl shadow-red-500/50 z-50 hover:scale-110 transition-transform duration-300"
-      >
-        <LogOut size={20} />
-      </button>
+      
 
       {/* Logout Confirmation Modal */}
       {showLogoutModal && <LogoutModal />}

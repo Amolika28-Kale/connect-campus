@@ -1,4 +1,4 @@
-// context/AuthContext.jsx - Updated with profile photo persistence
+// context/AuthContext.jsx - Complete Fixed Version
 import { createContext, useContext, useState, useEffect } from "react";
 import API from "../api/axios";
 
@@ -7,6 +7,24 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // Get base URL based on environment
+  const getBaseUrl = () => {
+    return import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+  };
+
+  // Format profile image URL
+  const formatProfileImage = (imagePath) => {
+    if (!imagePath) return null;
+    if (imagePath.startsWith('http')) return imagePath;
+    
+    const baseUrl = getBaseUrl();
+    if (imagePath.includes('uploads/')) {
+      const filename = imagePath.split('uploads/').pop();
+      return `${baseUrl}/uploads/${filename}`;
+    }
+    return `${baseUrl}/uploads/profiles/${imagePath}`;
+  };
 
   // Initialize auth state from localStorage
   useEffect(() => {
@@ -21,25 +39,38 @@ export const AuthProvider = ({ children }) => {
           // Parse saved user
           const parsedUser = JSON.parse(savedUser);
           
-          // Verify token is still valid and get latest profile
-          const res = await API.get("/profile/me");
+          // Format profile image URL
+          if (parsedUser.profileImage) {
+            parsedUser.profileImage = formatProfileImage(parsedUser.profileImage);
+          }
           
-          // Merge saved data with latest profile data
-          const updatedUser = {
-            ...parsedUser,
-            ...res.data,
-            // Ensure profile image is included
-            profileImage: res.data.profileImage || parsedUser.profileImage
-          };
+          setUser(parsedUser);
           
-          setUser(updatedUser);
-          
-          // Update localStorage with latest data
-          localStorage.setItem("userData", JSON.stringify(updatedUser));
-          
-          console.log("✅ User restored and updated:", updatedUser);
+          // Fetch latest profile from server
+          try {
+            const res = await API.get("/profile/me");
+            console.log("✅ Fetched latest profile:", res.data);
+            
+            // Format image URL from server response
+            if (res.data.profileImage) {
+              res.data.profileImage = formatProfileImage(res.data.profileImage);
+            }
+            
+            // Merge saved data with latest profile data
+            const updatedUser = {
+              ...parsedUser,
+              ...res.data,
+            };
+            
+            setUser(updatedUser);
+            localStorage.setItem("userData", JSON.stringify(updatedUser));
+            
+            console.log("✅ User restored and updated:", updatedUser);
+          } catch (profileErr) {
+            console.log("Could not fetch latest profile, using saved data");
+          }
         } catch (err) {
-          console.log("❌ Token invalid, clearing storage");
+          console.log("❌ Error restoring user:", err);
           localStorage.removeItem("token");
           localStorage.removeItem("userData");
           setUser(null);
@@ -61,19 +92,25 @@ export const AuthProvider = ({ children }) => {
       
       console.log("✅ Login successful:", userData);
       
-      // Fetch complete profile to get profile image
+      // Fetch complete profile
       let completeUserData = userData;
       try {
         const profileRes = await API.get("/profile/me");
+        console.log("✅ Fetched profile after login:", profileRes.data);
+        
+        // Format profile image URL
+        if (profileRes.data.profileImage) {
+          profileRes.data.profileImage = formatProfileImage(profileRes.data.profileImage);
+        }
+        
         completeUserData = {
           ...userData,
-          ...profileRes.data
+          ...profileRes.data,
         };
       } catch (profileErr) {
         console.log("Could not fetch profile details:", profileErr);
       }
       
-      // Store in localStorage
       localStorage.setItem("token", token);
       localStorage.setItem("userData", JSON.stringify(completeUserData));
       
@@ -85,10 +122,18 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Update user profile (call this after photo upload)
+  // Update user profile (call after photo upload)
   const updateUserProfile = async () => {
     try {
+      console.log("🔄 Updating user profile...");
       const res = await API.get("/profile/me");
+      console.log("✅ Profile updated:", res.data);
+      
+      // Format profile image URL
+      if (res.data.profileImage) {
+        res.data.profileImage = formatProfileImage(res.data.profileImage);
+      }
+      
       const updatedUser = { ...user, ...res.data };
       
       setUser(updatedUser);
@@ -97,6 +142,7 @@ export const AuthProvider = ({ children }) => {
       return updatedUser;
     } catch (error) {
       console.error("Failed to update user profile:", error);
+      throw error;
     }
   };
 
@@ -127,7 +173,7 @@ export const AuthProvider = ({ children }) => {
       signup, 
       logout, 
       loading,
-      updateUserProfile // Add this to context
+      updateUserProfile
     }}>
       {!loading ? children : (
         <div className="h-screen flex items-center justify-center">

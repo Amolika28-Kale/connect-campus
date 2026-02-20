@@ -1,5 +1,5 @@
-// pages/Settings.jsx - Complete Fixed Version
-import { useState, useRef } from "react";
+// pages/Settings.jsx - Complete with All Signup Details
+import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import API from "../api/axios";
@@ -13,7 +13,17 @@ import {
   Moon,
   Upload,
   X,
-  Check
+  Check,
+  Mail,
+  Phone,
+  Calendar,
+  MapPin,
+  GraduationCap,
+  CreditCard,
+  Eye,
+  EyeOff,
+  Download,
+  Clock
 } from "lucide-react";
 
 const Settings = () => {
@@ -25,6 +35,8 @@ const Settings = () => {
   const [previewImage, setPreviewImage] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [showCollegeId, setShowCollegeId] = useState(false);
+  const [userFullData, setUserFullData] = useState(null);
   const fileInputRef = useRef(null);
   
   // Password change state
@@ -33,6 +45,21 @@ const Settings = () => {
     new: "",
     confirm: "",
   });
+
+  // Fetch full user data on mount
+  useEffect(() => {
+    fetchFullUserData();
+  }, []);
+
+  const fetchFullUserData = async () => {
+    try {
+      const res = await API.get("/profile/me");
+      setUserFullData(res.data);
+      console.log("📥 Fetched full user data:", res.data);
+    } catch (error) {
+      console.error("Failed to fetch user data:", error);
+    }
+  };
   
   // Profile form state
   const [profile, setProfile] = useState({
@@ -44,7 +71,7 @@ const Settings = () => {
     showAge: true,
   });
 
-  // 🔥 ADD THIS FUNCTION - Handle profile update
+  // Handle profile update
   const handleUpdateProfile = async () => {
     try {
       setLoading(true);
@@ -54,7 +81,6 @@ const Settings = () => {
         interests: profile.interests
       });
       
-      // Update context with new data
       if (updateUserProfile) {
         await updateUserProfile();
       }
@@ -101,12 +127,13 @@ const Settings = () => {
         headers: { "Content-Type": "multipart/form-data" },
       });
       
-      // Update profile in state
+      console.log("✅ Photo upload response:", res.data);
+      
       setProfile({ ...profile, profileImage: res.data.profileImage });
       
-      // Update AuthContext with new photo
       if (updateUserProfile) {
-        await updateUserProfile();
+        const updatedUser = await updateUserProfile();
+        console.log("✅ AuthContext updated with new photo:", updatedUser);
       }
       
       setUploadSuccess(true);
@@ -173,8 +200,38 @@ const Settings = () => {
     }
   };
 
+  const formatDate = (dateString) => {
+    if (!dateString) return "Not provided";
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+  };
+
+  // Get profile image URL
+  const getProfileImageUrl = (imagePath) => {
+    if (!imagePath) return null;
+    
+    if (imagePath.startsWith('http')) {
+      return imagePath;
+    }
+    
+    if (imagePath.includes('uploads/')) {
+      const filename = imagePath.split('uploads/').pop();
+      return `https://campus-backend-3axn.onrender.com/uploads/${filename}`;
+            // return `http://localhost:5000/uploads/${filename}`;
+
+    }
+    
+    return `https://campus-backend-3axn.onrender.com/uploads/profiles/${imagePath}`;
+    // return `http://localhost:5000/uploads/profiles/${imagePath}`;
+  };
+
   const tabs = [
     { id: "profile", label: "Profile", icon: User },
+    { id: "details", label: "My Details", icon: Mail },
     { id: "privacy", label: "Privacy", icon: Lock },
     { id: "notifications", label: "Notifications", icon: Bell },
     { id: "appearance", label: "Appearance", icon: Moon },
@@ -234,8 +291,7 @@ const Settings = () => {
                         />
                       ) : profile.profileImage ? (
                         <img 
-                          src={profile.profileImage.startsWith('http') ? profile.profileImage :
-                             `https://campus-backend-3axn.onrender.com/${profile.profileImage}`} 
+                          src={getProfileImageUrl(profile.profileImage)} 
                           alt={user?.fullName} 
                           className="w-full h-full object-cover"
                           onError={(e) => {
@@ -250,7 +306,6 @@ const Settings = () => {
                       )}
                     </div>
                     
-                    {/* Upload Success Badge */}
                     {uploadSuccess && (
                       <div className="absolute -bottom-2 -right-2 bg-green-500 text-white p-1 rounded-full animate-bounce">
                         <Check size={16} />
@@ -316,7 +371,6 @@ const Settings = () => {
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold">Basic Information</h3>
                 
-                {/* Full Name */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Full Name
@@ -329,7 +383,6 @@ const Settings = () => {
                   />
                 </div>
 
-                {/* Email (Read Only) */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Email
@@ -342,7 +395,6 @@ const Settings = () => {
                   />
                 </div>
 
-                {/* Bio */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Bio
@@ -356,10 +408,9 @@ const Settings = () => {
                   />
                 </div>
 
-                {/* Interests */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Interests (Select multiple)
+                    Interests
                   </label>
                   <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-2 border rounded-lg">
                     {interestOptions.map((interest) => (
@@ -395,10 +446,164 @@ const Settings = () => {
             </div>
           )}
 
+          {/* My Details Tab - NEW TAB WITH ALL SIGNUP INFO */}
+          {activeTab === "details" && (
+            <div className="space-y-6">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <User size={18} className="text-pink-500" />
+                Personal Information
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Full Name */}
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-2 text-gray-600 text-sm mb-1">
+                    <User size={14} />
+                    <span>Full Name</span>
+                  </div>
+                  <p className="font-medium text-gray-800">{userFullData?.fullName || user?.fullName}</p>
+                </div>
+
+                {/* Email */}
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-2 text-gray-600 text-sm mb-1">
+                    <Mail size={14} />
+                    <span>Email</span>
+                  </div>
+                  <p className="font-medium text-gray-800">{userFullData?.email || user?.email}</p>
+                </div>
+
+                {/* Phone */}
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-2 text-gray-600 text-sm mb-1">
+                    <Phone size={14} />
+                    <span>Phone Number</span>
+                  </div>
+                  <p className="font-medium text-gray-800">{userFullData?.phone || "Not provided"}</p>
+                </div>
+
+                {/* Gender */}
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-2 text-gray-600 text-sm mb-1">
+                    <User size={14} />
+                    <span>Gender</span>
+                  </div>
+                  <p className="font-medium text-gray-800 capitalize">{userFullData?.gender || user?.gender}</p>
+                </div>
+
+                {/* Date of Birth */}
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-2 text-gray-600 text-sm mb-1">
+                    <Calendar size={14} />
+                    <span>Date of Birth</span>
+                  </div>
+                  <p className="font-medium text-gray-800">{formatDate(userFullData?.dob)}</p>
+                </div>
+
+                {/* Age */}
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-2 text-gray-600 text-sm mb-1">
+                    <Calendar size={14} />
+                    <span>Age</span>
+                  </div>
+                  <p className="font-medium text-gray-800">
+                    {userFullData?.dob ? calculateAge(userFullData.dob) : 'N/A'} years
+                  </p>
+                </div>
+
+                {/* College */}
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-2 text-gray-600 text-sm mb-1">
+                    <GraduationCap size={14} />
+                    <span>College</span>
+                  </div>
+                  <p className="font-medium text-gray-800">{userFullData?.college?.name || "Not specified"}</p>
+                </div>
+
+                {/* Account Status */}
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-2 text-gray-600 text-sm mb-1">
+                    <Shield size={14} />
+                    <span>Account Status</span>
+                  </div>
+                  <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
+                    userFullData?.status === 'active' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'
+                  }`}>
+                    {userFullData?.status || 'Active'}
+                  </span>
+                </div>
+
+                {/* Member Since */}
+                <div className="p-4 bg-gray-50 rounded-lg md:col-span-2">
+                  <div className="flex items-center gap-2 text-gray-600 text-sm mb-1">
+                    <Calendar size={14} />
+                    <span>Member Since</span>
+                  </div>
+                  <p className="font-medium text-gray-800">{formatDate(userFullData?.createdAt)}</p>
+                </div>
+              </div>
+
+              {/* College ID Card Section */}
+              <div className="border-t pt-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <CreditCard size={18} className="text-pink-500" />
+                  College ID Card
+                </h3>
+                
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-600 mb-3">Your uploaded college ID card for verification</p>
+                  
+                  {userFullData?.collegeIdImage ? (
+                    <div className="space-y-3">
+                      <button
+                        onClick={() => setShowCollegeId(!showCollegeId)}
+                        className="flex items-center gap-2 text-pink-600 hover:text-pink-700 transition"
+                      >
+                        <Eye size={18} />
+                        {showCollegeId ? 'Hide' : 'View'} College ID
+                      </button>
+                      
+                      {showCollegeId && (
+                        <div className="relative rounded-lg overflow-hidden border-2 border-gray-200">
+                          <img 
+                            src={getProfileImageUrl(userFullData.collegeIdImage)} 
+                            alt="College ID"
+                            className="w-full max-w-md mx-auto"
+                          />
+                          <a
+                            href={getProfileImageUrl(userFullData.collegeIdImage)}
+                            download
+                            className="absolute top-2 right-2 p-2 bg-white rounded-full shadow-lg hover:bg-gray-100 transition"
+                          >
+                            <Download size={18} />
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500">No college ID uploaded</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Last Active */}
+              <div className="border-t pt-6">
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-2 text-gray-600 text-sm mb-1">
+                    <Clock size={14} />
+                    <span>Last Active</span>
+                  </div>
+                  <p className="font-medium text-gray-800">
+                    {userFullData?.lastActive ? new Date(userFullData.lastActive).toLocaleString() : 'Just now'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Privacy Tab */}
           {activeTab === "privacy" && (
             <div className="space-y-6">
-              {/* Change Password */}
               <div>
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <Lock size={18} className="text-pink-500" />
@@ -436,7 +641,6 @@ const Settings = () => {
                 </div>
               </div>
 
-              {/* Privacy Options */}
               <div className="border-t pt-6">
                 <h3 className="text-lg font-semibold mb-4">Privacy Options</h3>
                 <div className="space-y-3 max-w-md">
@@ -461,7 +665,6 @@ const Settings = () => {
                 </div>
               </div>
 
-              {/* Danger Zone */}
               <div className="border-t pt-6">
                 <h3 className="text-lg font-semibold mb-4 text-red-600">Danger Zone</h3>
                 <button
@@ -533,19 +736,33 @@ const Settings = () => {
       </div>
 
       {/* Mobile Logout Button */}
-      <button
-        onClick={() => {
-          if (window.confirm("Are you sure you want to logout?")) {
-            logout();
-            navigate("/login");
-          }
-        }}
-        className="md:hidden fixed bottom-20 right-4 w-12 h-12 bg-gradient-to-r from-red-500 to-pink-500 rounded-full flex items-center justify-center text-white shadow-xl shadow-red-500/50 z-50 hover:scale-110 transition-transform duration-300"
-      >
-        <LogOut size={20} />
-      </button>
+      <div className="md:hidden fixed bottom-20 left-0 right-0 flex justify-center px-4 z-40">
+        <button
+          onClick={() => {
+            if (window.confirm("Are you sure you want to logout?")) {
+              logout();
+              navigate("/login");
+            }
+          }}
+          className="w-full max-w-md bg-gradient-to-r from-red-500 to-pink-500 text-white py-3 rounded-xl font-semibold hover:from-red-600 hover:to-pink-600 transition-all shadow-lg shadow-red-500/30 flex items-center justify-center gap-2"
+        >
+          <LogOut size={20} />
+          Logout
+        </button>
+      </div>
+
+      {/* Extra padding for mobile */}
+      <div className="md:hidden h-16"></div>
     </div>
   );
+};
+
+// Helper function to calculate age
+const calculateAge = (dob) => {
+  if (!dob) return 'N/A';
+  const diff = new Date() - new Date(dob);
+  const age = Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
+  return age;
 };
 
 export default Settings;
