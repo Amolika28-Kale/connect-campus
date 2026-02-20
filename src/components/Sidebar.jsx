@@ -95,8 +95,6 @@ const Sidebar = () => {
   const getProfileImageUrl = (imagePath) => {
     if (!imagePath) return null;
     
-    console.log("🔧 Processing image path:", imagePath);
-    
     // If it's already a full URL
     if (imagePath.startsWith('http')) {
       // Ensure HTTPS in production
@@ -111,16 +109,13 @@ const Sidebar = () => {
     
     // Handle different path formats
     if (imagePath.includes('uploads/')) {
-      // Clean the path - remove any backslashes and get filename
       const cleanPath = imagePath.replace(/\\/g, '/');
       const filename = cleanPath.split('uploads/').pop();
       return `${baseUrl}/uploads/${filename}`;
     }
     
-    // If it's just a filename
     return `${baseUrl}/uploads/profiles/${imagePath}`;
   };
-
   // Get initials from name
   const getInitials = (name) => {
     return name?.charAt(0).toUpperCase() || '?';
@@ -186,7 +181,6 @@ const Sidebar = () => {
                         alt={user.fullName}
                         className="w-full h-full object-cover"
                         onError={(e) => {
-                          console.log("❌ Image load error for:", profileImageUrl);
                           setImageError(true);
                         }}
                         onLoad={() => console.log("✅ Image loaded successfully:", profileImageUrl)}

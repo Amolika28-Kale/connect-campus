@@ -1,4 +1,4 @@
-// pages/Messages.jsx - Enhanced with Profile Photos
+// pages/Messages.jsx - Fully Mobile Responsive
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -12,14 +12,11 @@ import {
   Circle,
   Search,
   Filter,
-  MoreVertical,
-  Heart,
-  Star,
-  Users,
   Sparkles,
   X,
-  Camera
+  User
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 const Messages = () => {
   const { user } = useAuth();
@@ -31,7 +28,20 @@ const Messages = () => {
   const [filterUnread, setFilterUnread] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [imageErrors, setImageErrors] = useState({});
+  const [isMobile, setIsMobile] = useState(false);
   const navigate = useNavigate();
+
+  // Check if mobile view
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     fetchMatches();
@@ -52,22 +62,17 @@ const Messages = () => {
       const details = {};
       for (const match of matchesData) {
         try {
-          // Get messages
           const msgRes = await API.get(`/chat/${match._id}`);
           const messages = msgRes.data;
           
-          // Get other user details
           const otherUser = match.users.find(u => u._id !== user?._id);
           
-          // Count unread messages
           const unreadCount = messages.filter(
             msg => msg.sender !== user?._id && !msg.seen
           ).length;
           
-          // Get last message
           const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
           
-          // Get last message status
           let lastMsgStatus = 'none';
           if (lastMsg) {
             if (lastMsg.sender === user?._id) {
@@ -117,32 +122,28 @@ const Messages = () => {
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
     
-    // Today
     if (msgDate.toDateString() === today.toDateString()) {
       return msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
     
-    // Yesterday
     if (msgDate.toDateString() === yesterday.toDateString()) {
       return 'Yesterday';
     }
     
-    // Within a week
     const diffDays = Math.floor((today - msgDate) / (1000 * 60 * 60 * 24));
     if (diffDays < 7) {
       return msgDate.toLocaleDateString([], { weekday: 'short' });
     }
     
-    // Older
     return msgDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
   };
 
   const getMessageStatusIcon = (status) => {
     switch(status) {
       case 'sent':
-        return <Check size={14} className="text-gray-400" />;
+        return <Check size={isMobile ? 10 : 14} className="text-gray-400" />;
       case 'seen':
-        return <CheckCheck size={14} className="text-blue-500" />;
+        return <CheckCheck size={isMobile ? 10 : 14} className="text-blue-500" />;
       default:
         return null;
     }
@@ -191,7 +192,6 @@ const Messages = () => {
     return gradients[index];
   };
 
-  // Handle image error
   const handleImageError = (userId) => {
     setImageErrors(prev => ({ ...prev, [userId]: true }));
   };
@@ -199,54 +199,54 @@ const Messages = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-pink-500 mx-auto mb-4"></div>
-          <p className="text-gray-500 animate-pulse">Loading conversations...</p>
+        <div className="text-center px-4">
+          <div className="animate-spin rounded-full h-12 w-12 md:h-16 md:w-16 border-t-4 border-pink-500 mx-auto mb-4"></div>
+          <p className="text-sm md:text-base text-gray-500 animate-pulse">Loading conversations...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 pb-24 md:pb-0">
+    <div className="max-w-4xl mx-auto px-3 md:px-4 lg:px-6 pb-20 md:pb-0">
       {/* Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-gradient-to-r from-pink-500 to-purple-600 rounded-2xl shadow-lg shadow-pink-500/30">
-            <MessageCircle size={24} className="text-white" />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 md:gap-4 mb-4 md:mb-6">
+        <div className="flex items-center gap-2 md:gap-3">
+          <div className="p-2 md:p-3 bg-gradient-to-r from-pink-500 to-purple-600 rounded-xl md:rounded-2xl shadow-lg shadow-pink-500/30">
+            <MessageCircle size={isMobile ? 20 : 24} className="text-white" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">
+            <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">
               Messages
             </h1>
-            <p className="text-sm text-gray-500">Connect with your matches</p>
+            <p className="text-xs md:text-sm text-gray-500">Connect with your matches</p>
           </div>
         </div>
         
         {matches.length > 0 && (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-3">
             {/* Search Toggle Button - Mobile */}
             <button
               onClick={() => setShowSearch(!showSearch)}
-              className="sm:hidden p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition"
+              className="sm:hidden p-1.5 md:p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition"
             >
-              <Search size={20} className="text-gray-600" />
+              <Search size={isMobile ? 16 : 20} className="text-gray-600" />
             </button>
             
             {/* Filter Button */}
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`p-2 rounded-full transition ${
+              className={`p-1.5 md:p-2 rounded-full transition ${
                 filterUnread || showFilters 
                   ? 'bg-pink-500 text-white' 
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
-              <Filter size={20} />
+              <Filter size={isMobile ? 16 : 20} />
             </button>
             
             {/* Total Chats Badge */}
-            <span className="bg-gradient-to-r from-pink-500 to-purple-600 text-white px-4 py-2 rounded-full text-sm font-medium shadow-md">
+            <span className="bg-gradient-to-r from-pink-500 to-purple-600 text-white px-3 md:px-4 py-1 md:py-2 rounded-full text-xs md:text-sm font-medium shadow-md">
               {matches.length} {matches.length === 1 ? 'Chat' : 'Chats'}
             </span>
           </div>
@@ -255,22 +255,22 @@ const Messages = () => {
 
       {/* Search Bar - Desktop & Mobile */}
       {(showSearch || !searchTerm) && (
-        <div className={`mb-4 transition-all duration-300 ${showSearch ? 'block' : 'hidden sm:block'}`}>
+        <div className={`mb-3 md:mb-4 transition-all duration-300 ${showSearch ? 'block' : 'hidden sm:block'}`}>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={isMobile ? 16 : 18} />
             <input
               type="text"
               placeholder="Search conversations..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all"
+              className="w-full pl-9 md:pl-10 pr-8 md:pr-10 py-2 md:py-3 text-sm md:text-base bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all"
             />
             {searchTerm && (
               <button
                 onClick={() => setSearchTerm("")}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                className="absolute right-2 md:right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >
-                <X size={16} />
+                <X size={isMobile ? 14 : 16} />
               </button>
             )}
           </div>
@@ -278,59 +278,66 @@ const Messages = () => {
       )}
 
       {/* Filters Panel */}
-      {showFilters && (
-        <div className="mb-4 p-4 bg-white rounded-xl shadow-lg border border-gray-100 animate-slideDown">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-gray-700">Filter Conversations</h3>
-            <button
-              onClick={() => setShowFilters(false)}
-              className="p-1 hover:bg-gray-100 rounded-full"
-            >
-              <X size={16} />
-            </button>
-          </div>
-          <div className="space-y-2">
-            <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition">
-              <div className="flex items-center gap-3">
-                <div className={`w-5 h-5 rounded-full ${filterUnread ? 'bg-pink-500' : 'bg-gray-300'}`}>
-                  {filterUnread && <Check size={14} className="text-white m-0.5" />}
+      <AnimatePresence>
+        {showFilters && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="mb-3 md:mb-4 p-3 md:p-4 bg-white rounded-xl shadow-lg border border-gray-100"
+          >
+            <div className="flex items-center justify-between mb-2 md:mb-3">
+              <h3 className="font-semibold text-gray-700 text-sm md:text-base">Filter Conversations</h3>
+              <button
+                onClick={() => setShowFilters(false)}
+                className="p-1 hover:bg-gray-100 rounded-full"
+              >
+                <X size={isMobile ? 14 : 16} />
+              </button>
+            </div>
+            <div className="space-y-2">
+              <label className="flex items-center justify-between p-2 md:p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition">
+                <div className="flex items-center gap-2 md:gap-3">
+                  <div className={`w-4 h-4 md:w-5 md:h-5 rounded-full ${filterUnread ? 'bg-pink-500' : 'bg-gray-300'}`}>
+                    {filterUnread && <Check size={isMobile ? 10 : 14} className="text-white m-0.5" />}
+                  </div>
+                  <span className="text-xs md:text-sm font-medium">Unread only</span>
                 </div>
-                <span className="font-medium">Unread only</span>
-              </div>
-              <span className="text-sm text-gray-500">
-                {Object.values(matchDetails).filter(d => d?.unreadCount > 0).length} chats
-              </span>
-            </label>
-          </div>
-        </div>
-      )}
+                <span className="text-[10px] md:text-xs text-gray-500">
+                  {Object.values(matchDetails).filter(d => d?.unreadCount > 0).length} chats
+                </span>
+              </label>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Empty State */}
       {matches.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-2xl shadow-sm border border-gray-100">
-          <div className="w-24 h-24 bg-gradient-to-r from-pink-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <MessageCircle size={48} className="text-pink-500" />
+        <div className="text-center py-12 md:py-16 bg-white rounded-xl md:rounded-2xl shadow-sm border border-gray-100 px-4">
+          <div className="w-16 h-16 md:w-24 md:h-24 bg-gradient-to-r from-pink-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6">
+            <MessageCircle size={isMobile ? 32 : 48} className="text-pink-500" />
           </div>
-          <h3 className="text-2xl font-semibold text-gray-800 mb-3">No conversations yet</h3>
-          <p className="text-gray-500 mb-8 max-w-sm mx-auto">
+          <h3 className="text-xl md:text-2xl font-semibold text-gray-800 mb-2 md:mb-3">No conversations yet</h3>
+          <p className="text-sm md:text-base text-gray-500 mb-6 md:mb-8 max-w-sm mx-auto">
             Match with someone special to start chatting and make new connections!
           </p>
           <button
             onClick={() => navigate("/discovery")}
-            className="px-8 py-3 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-xl font-semibold hover:opacity-90 transition-all transform hover:scale-105 shadow-lg shadow-pink-500/30 inline-flex items-center gap-2"
+            className="px-6 md:px-8 py-2 md:py-3 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-xl text-sm md:text-base font-semibold hover:opacity-90 transition-all transform hover:scale-105 shadow-lg shadow-pink-500/30 inline-flex items-center gap-2"
           >
-            <Sparkles size={18} />
+            <Sparkles size={isMobile ? 16 : 18} />
             Find Matches
           </button>
         </div>
       ) : filteredMatches.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-xl shadow-sm">
-          <Search size={48} className="mx-auto text-gray-300 mb-4" />
-          <h3 className="text-xl font-semibold text-gray-700 mb-2">No matches found</h3>
-          <p className="text-gray-500">Try adjusting your search or filters</p>
+        <div className="text-center py-10 md:py-12 bg-white rounded-xl shadow-sm px-4">
+          <Search size={isMobile ? 32 : 48} className="mx-auto text-gray-300 mb-3 md:mb-4" />
+          <h3 className="text-lg md:text-xl font-semibold text-gray-700 mb-2">No matches found</h3>
+          <p className="text-sm md:text-base text-gray-500">Try adjusting your search or filters</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2 md:space-y-3">
           {filteredMatches.map((match) => {
             const details = matchDetails[match._id];
             const otherUser = details?.otherUser;
@@ -346,17 +353,17 @@ const Messages = () => {
               <div
                 key={match._id}
                 onClick={() => navigate(`/chat/${match._id}`)}
-                className="group relative bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer overflow-hidden border border-gray-100 hover:border-pink-200"
+                className="group relative bg-white rounded-lg md:rounded-xl shadow-sm hover:shadow-md transition-all duration-300 cursor-pointer overflow-hidden border border-gray-100 hover:border-pink-200"
               >
                 {/* Unread Indicator Line */}
                 {unreadCount > 0 && (
                   <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-pink-500 to-purple-500"></div>
                 )}
                 
-                <div className="flex items-center gap-4 p-4">
+                <div className="flex items-center gap-2 md:gap-4 p-2 md:p-4">
                   {/* Avatar with Profile Photo */}
                   <div className="relative flex-shrink-0">
-                    <div className="w-16 h-16 rounded-2xl overflow-hidden shadow-md transform group-hover:scale-105 transition-transform duration-300">
+                    <div className="w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl overflow-hidden shadow-md transform group-hover:scale-105 transition-transform duration-300">
                       {profileImageUrl && !hasImageError ? (
                         <img 
                           src={profileImageUrl} 
@@ -365,22 +372,22 @@ const Messages = () => {
                           onError={() => handleImageError(otherUser?._id)}
                         />
                       ) : (
-                        <div className={`w-full h-full bg-gradient-to-r ${getRandomGradient(otherUser?._id)} flex items-center justify-center text-white font-bold text-2xl`}>
+                        <div className={`w-full h-full bg-gradient-to-r ${getRandomGradient(otherUser?._id)} flex items-center justify-center text-white font-bold text-base md:text-2xl`}>
                           {getInitials(otherUser?.fullName)}
                         </div>
                       )}
                     </div>
                     
                     {/* Online Status */}
-                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
+                    <div className="absolute -bottom-0.5 -right-0.5 md:-bottom-1 md:-right-1 w-2.5 h-2.5 md:w-4 md:h-4 bg-green-500 rounded-full border-1.5 md:border-2 border-white"></div>
                     
                     {/* Unread Badge - Mobile */}
                     {unreadCount > 0 && (
                       <div className="absolute -top-1 -right-1 md:hidden">
                         {unreadCount === 1 ? (
-                          <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse border-2 border-white"></div>
+                          <div className="w-2 h-2 md:w-3 md:h-3 bg-green-500 rounded-full animate-pulse border-1.5 border-white"></div>
                         ) : (
-                          <span className="bg-green-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center animate-pulse border-2 border-white">
+                          <span className="bg-green-500 text-white text-[8px] md:text-xs font-bold px-1 py-0.5 rounded-full min-w-[16px] text-center animate-pulse border border-white">
                             {unreadCount > 9 ? '9+' : unreadCount}
                           </span>
                         )}
@@ -390,8 +397,8 @@ const Messages = () => {
 
                   {/* Message Content */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <h3 className={`text-base truncate ${
+                    <div className="flex items-center justify-between mb-0.5 md:mb-1.5">
+                      <h3 className={`text-sm md:text-base truncate ${
                         unreadCount > 0 
                           ? 'font-bold text-gray-900' 
                           : 'font-semibold text-gray-700'
@@ -399,16 +406,16 @@ const Messages = () => {
                         {otherUser?.fullName}
                       </h3>
                       {lastMsg && (
-                        <span className="text-xs text-gray-400 flex items-center gap-1 ml-2 whitespace-nowrap bg-gray-50 px-2 py-1 rounded-full">
-                          <Clock size={10} />
-                          {formatTime(lastMsg.createdAt)}
+                        <span className="text-[10px] md:text-xs text-gray-400 flex items-center gap-1 ml-1 whitespace-nowrap bg-gray-50 px-1.5 md:px-2 py-0.5 rounded-full">
+                          <Clock size={isMobile ? 8 : 10} />
+                          <span className="hidden xs:inline">{formatTime(lastMsg.createdAt)}</span>
                         </span>
                       )}
                     </div>
                     
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 md:gap-2">
                       {/* Message Preview with Status */}
-                      <div className={`flex-1 flex items-center gap-1.5 text-sm truncate ${
+                      <div className={`flex-1 flex items-center gap-1 md:gap-1.5 text-xs md:text-sm truncate ${
                         unreadCount > 0 
                           ? 'text-gray-900 font-medium' 
                           : 'text-gray-500'
@@ -434,7 +441,7 @@ const Messages = () => {
                       {unreadCount > 0 && (
                         <div className="hidden md:block">
                           {unreadCount === 1 ? (
-                            <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse"></div>
+                            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                           ) : (
                             <span className="bg-green-500 text-white text-xs font-bold px-2 py-0.5 rounded-full min-w-[22px] text-center animate-pulse">
                               {unreadCount > 9 ? '9+' : unreadCount}
@@ -445,20 +452,26 @@ const Messages = () => {
                     </div>
 
                     {/* Message Stats (for mobile) */}
-                    <div className="flex items-center gap-3 mt-2 md:hidden">
+                    <div className="flex items-center gap-2 mt-1 md:hidden">
                       {unreadCount > 0 && (
-                        <span className="text-xs text-green-500 flex items-center gap-1">
-                          <Circle size={8} className="fill-green-500" />
+                        <span className="text-[10px] text-green-500 flex items-center gap-1">
+                          <Circle size={6} className="fill-green-500" />
                           {unreadCount} unread
+                        </span>
+                      )}
+                      {details?.totalMessages > 0 && (
+                        <span className="text-[10px] text-gray-400 flex items-center gap-1">
+                          <MessageCircle size={6} />
+                          {details.totalMessages}
                         </span>
                       )}
                     </div>
                   </div>
 
-                  {/* Arrow Icon - Desktop */}
+                  {/* Arrow Icon - Hidden on mobile */}
                   <ChevronRight 
-                    size={20} 
-                    className="hidden md:block text-gray-300 group-hover:text-pink-500 transition-all transform group-hover:translate-x-1 flex-shrink-0" 
+                    size={isMobile ? 16 : 20} 
+                    className="hidden sm:block text-gray-300 group-hover:text-pink-500 transition-all transform group-hover:translate-x-1 flex-shrink-0" 
                   />
                 </div>
 
@@ -470,13 +483,31 @@ const Messages = () => {
         </div>
       )}
 
-      {/* Quick Actions - Mobile */}
+      {/* Quick Stats (for desktop) */}
+      {matches.length > 0 && !isMobile && (
+        <div className="mt-6 flex items-center justify-end gap-4 text-xs text-gray-400">
+          <div className="flex items-center gap-1">
+            <Check size={12} className="text-gray-400" />
+            <span>Sent</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <CheckCheck size={12} className="text-blue-500" />
+            <span>Seen</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+            <span>Unread</span>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Actions - Mobile FAB */}
       <div className="md:hidden fixed bottom-20 right-4 flex flex-col gap-2 z-40">
         <button
           onClick={() => navigate("/discovery")}
-          className="w-12 h-12 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full flex items-center justify-center text-white shadow-xl shadow-pink-500/50 hover:scale-110 transition-transform duration-300"
+          className="w-10 h-10 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full flex items-center justify-center text-white shadow-xl shadow-pink-500/50 hover:scale-110 transition-transform duration-300"
         >
-          <Sparkles size={20} />
+          <Sparkles size={18} />
         </button>
       </div>
     </div>

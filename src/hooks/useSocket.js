@@ -16,7 +16,6 @@ export const useSocket = () => {
     const token = localStorage.getItem('token');
     console.log("🔌 Attempting socket connection...");
     
-    // const newSocket = io('http://localhost:5000', {
         const newSocket = io('https://campus-backend-3axn.onrender.com', {
 
       auth: { token },

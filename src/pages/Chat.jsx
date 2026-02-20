@@ -1,4 +1,4 @@
-// pages/Chat.jsx - Complete with Block, Report, View Profile, Delete & Clear Chat
+// pages/Chat.jsx - Fully Mobile Responsive with Toast Messages
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useSocket } from "../hooks/useSocket";
@@ -26,11 +26,12 @@ import {
   Flag,
   MessageSquare,
   Clock,
+  Loader,
   CheckCircle,
-  XCircle,
-  Loader
+  AlertCircle
 } from "lucide-react";
 import EmojiPicker from 'emoji-picker-react';
+import { motion, AnimatePresence } from "framer-motion";
 
 const Chat = () => {
   const { matchId } = useParams();
@@ -47,7 +48,6 @@ const Chat = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteForEveryone, setDeleteForEveryone] = useState(false);
   const [replyingTo, setReplyingTo] = useState(null);
-  const [showMessageOptions, setShowMessageOptions] = useState(null);
   const [showReportModal, setShowReportModal] = useState(false);
   const [showBlockModal, setShowBlockModal] = useState(false);
   const [showClearChatModal, setShowClearChatModal] = useState(false);
@@ -57,15 +57,57 @@ const Chat = () => {
   const [clearing, setClearing] = useState(false);
   const [otherUserProfile, setOtherUserProfile] = useState(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [imageErrors, setImageErrors] = useState({});
+  const [isMobile, setIsMobile] = useState(false);
+  const [toast, setToast] = useState(null);
   
   const messagesEndRef = useRef(null);
   const socket = useSocket();
   const inputRef = useRef(null);
   const emojiPickerRef = useRef(null);
-  const messageOptionsRef = useRef(null);
   
   // Typing timeout ref
   const typingTimeoutRef = useRef(null);
+
+  // Show toast message
+  const showToast = (message, type = 'success', duration = 3000) => {
+    setToast({ message, type, id: Date.now() });
+    setTimeout(() => setToast(null), duration);
+  };
+
+  // Check if mobile view
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Get profile image URL with HTTPS support
+  const getProfileImageUrl = (imagePath) => {
+    if (!imagePath) return null;
+    
+    if (imagePath.startsWith('http')) {
+      if (window.location.protocol === 'https:' && imagePath.startsWith('http://')) {
+        return imagePath.replace('http://', 'https://');
+      }
+      return imagePath;
+    }
+    
+    const baseUrl = 'https://campus-backend-3axn.onrender.com';
+    
+    if (imagePath.includes('uploads/')) {
+      const cleanPath = imagePath.replace(/\\/g, '/');
+      const filename = cleanPath.split('uploads/').pop();
+      return `${baseUrl}/uploads/${filename}`;
+    }
+    
+    return `${baseUrl}/uploads/profiles/${imagePath}`;
+  };
 
   // Fetch messages and match details
   useEffect(() => {
@@ -84,11 +126,9 @@ const Chat = () => {
 
     console.log("🔄 Setting up socket listeners for match:", matchId);
 
-    // Join match room
     socket.emit('join-match', matchId);
     console.log("📢 Joined match room:", matchId);
 
-    // Listen for new messages
     const handleNewMessage = (message) => {
       console.log("📨 New message received:", message);
       
@@ -118,28 +158,22 @@ const Chat = () => {
       setTimeout(scrollToBottom, 100);
     };
 
-    // Listen for deleted message
     const handleMessageDeleted = ({ messageId, deleteForEveryone }) => {
       console.log("🗑️ Message deleted:", messageId, "forEveryone:", deleteForEveryone);
       
       setMessages(prevMessages => {
         if (deleteForEveryone) {
           return prevMessages.filter(m => m._id !== messageId);
-        } else {
-          return prevMessages.map(m => 
-            m._id === messageId ? { ...m, deleted: true } : m
-          );
         }
+        return prevMessages;
       });
     };
 
-    // Listen for chat cleared
     const handleChatCleared = ({ matchId }) => {
       console.log("🗑️ Chat cleared for match:", matchId);
       setMessages([]);
     };
 
-    // Listen for typing indicator
     const handleUserTyping = ({ userId, isTyping }) => {
       console.log(`✏️ User ${userId} typing:`, isTyping);
       
@@ -156,7 +190,6 @@ const Chat = () => {
       }
     };
 
-    // Listen for seen status
     const handleMessagesSeen = ({ userId, matchId }) => {
       console.log(`👁️ Messages seen by ${userId} in match ${matchId}`);
       setMessages(prevMessages => 
@@ -166,11 +199,18 @@ const Chat = () => {
       );
     };
 
+    const handleUserClearedChat = ({ matchId, userId }) => {
+      console.log(`👤 User ${userId} cleared chat for match ${matchId}`);
+      showToast(`${matchDetails?.fullName || 'User'} cleared their chat`, 'info');
+      fetchMessages();
+    };
+
     socket.on('new-message', handleNewMessage);
     socket.on('message-deleted', handleMessageDeleted);
     socket.on('chat-cleared', handleChatCleared);
     socket.on('user-typing', handleUserTyping);
     socket.on('messages-seen', handleMessagesSeen);
+    socket.on('user-cleared-chat', handleUserClearedChat);
 
     return () => {
       socket.off('new-message', handleNewMessage);
@@ -178,6 +218,7 @@ const Chat = () => {
       socket.off('chat-cleared', handleChatCleared);
       socket.off('user-typing', handleUserTyping);
       socket.off('messages-seen', handleMessagesSeen);
+      socket.off('user-cleared-chat', handleUserClearedChat);
       
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
@@ -185,18 +226,6 @@ const Chat = () => {
       }
     };
   }, [socket, matchId, user]);
-
-  // Handle click outside message options
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (messageOptionsRef.current && !messageOptionsRef.current.contains(event.target)) {
-        setShowMessageOptions(null);
-      }
-    };
-    
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -214,47 +243,56 @@ const Chat = () => {
       console.log("📥 Fetched messages:", res.data);
       setMessages(res.data);
       
-      // Mark as seen
       await API.put(`/chat/seen/${matchId}`);
     } catch (error) {
       console.error("Failed to fetch messages:", error);
+      showToast("Failed to load messages", "error");
     } finally {
       setLoading(false);
     }
   };
-// Update fetchMatchDetails function
-const fetchMatchDetails = async () => {
-  try {
-    const res = await API.get("/match");
-    const match = res.data.find(m => m._id === matchId);
-    if (match) {
-      const otherUser = match.users.find(u => u._id !== user?._id);
-      setMatchDetails(otherUser);
-      
-      // Fetch full profile of other user
-      try {
-        console.log("Fetching profile for user:", otherUser._id);
-        const profileRes = await API.get(`/profile/${otherUser._id}`);
-        console.log("Profile data received:", profileRes.data);
-        setOtherUserProfile(profileRes.data);
-      } catch (err) {
-        console.error("Failed to fetch other user profile:", err);
-        // Set fallback data
-        setOtherUserProfile({
-          bio: otherUser.bio || 'No bio available',
-          interests: otherUser.interests || [],
-          college: otherUser.college,
-          createdAt: otherUser.createdAt || new Date().toISOString(),
-          gender: otherUser.gender
+
+  const fetchMatchDetails = async () => {
+    try {
+      const res = await API.get("/match");
+      const match = res.data.find(m => m._id === matchId);
+      if (match) {
+        const otherUser = match.users.find(u => u._id !== user?._id);
+        
+        const profileImageUrl = getProfileImageUrl(otherUser?.profileImage);
+        
+        setMatchDetails({
+          ...otherUser,
+          profileImage: profileImageUrl
         });
+        
+        try {
+          console.log("Fetching profile for user:", otherUser._id);
+          const profileRes = await API.get(`/profile/${otherUser._id}`);
+          
+          if (profileRes.data.profileImage) {
+            profileRes.data.profileImage = getProfileImageUrl(profileRes.data.profileImage);
+          }
+          
+          console.log("Profile data received:", profileRes.data);
+          setOtherUserProfile(profileRes.data);
+        } catch (err) {
+          console.error("Failed to fetch other user profile:", err);
+          setOtherUserProfile({
+            bio: otherUser.bio || 'No bio available',
+            interests: otherUser.interests || [],
+            college: otherUser.college,
+            createdAt: otherUser.createdAt || new Date().toISOString(),
+            gender: otherUser.gender
+          });
+        }
+        
+        console.log("👤 Match details:", otherUser);
       }
-      
-      console.log("👤 Match details:", otherUser);
+    } catch (error) {
+      console.error("Failed to fetch match details:", error);
     }
-  } catch (error) {
-    console.error("Failed to fetch match details:", error);
-  }
-};
+  };
 
   const sendMessage = (e) => {
     e.preventDefault();
@@ -300,66 +338,81 @@ const fetchMatchDetails = async () => {
         content: messageContent
       }).then(() => {
         fetchMessages();
+        showToast("Message sent", "success");
       }).catch(err => {
         console.error("HTTP backup failed:", err);
+        showToast("Failed to send message", "error");
       });
     }
   };
 
- // In Chat.jsx, update handleDeleteMessage function
-const handleDeleteMessage = async () => {
-  if (!selectedMessage) return;
+  const handleDeleteMessage = async () => {
+    if (!selectedMessage) return;
 
-  try {
-    if (deleteForEveryone) {
-      console.log("Deleting for everyone:", selectedMessage._id);
-      const response = await API.delete(`/chat/message/${selectedMessage._id}?forEveryone=true`);
-      console.log("Delete response:", response.data);
-      
-      if (socket && socket.connected) {
-        socket.emit('delete-message', {
-          messageId: selectedMessage._id,
-          matchId,
-          forEveryone: true
-        });
+    if (selectedMessage._id.toString().startsWith('temp-')) {
+      showToast("Cannot delete message while sending", "warning");
+      setShowDeleteModal(false);
+      setSelectedMessage(null);
+      return;
+    }
+
+    try {
+      if (deleteForEveryone) {
+        console.log("Deleting for everyone:", selectedMessage._id);
+        const response = await API.delete(`/chat/message/${selectedMessage._id}?forEveryone=true`);
+        console.log("Delete response:", response.data);
+        
+        if (socket && socket.connected) {
+          socket.emit('delete-message', {
+            messageId: selectedMessage._id,
+            matchId,
+            forEveryone: true
+          });
+        }
+        
+        setMessages(prev => prev.filter(m => m._id !== selectedMessage._id));
+        showToast("Message deleted for everyone", "success");
+      } else {
+        console.log("Deleting for me:", selectedMessage._id);
+        const response = await API.delete(`/chat/message/${selectedMessage._id}?forEveryone=false`);
+        console.log("Delete response:", response.data);
+        
+        setMessages(prev => prev.filter(m => m._id !== selectedMessage._id));
+        showToast("Message deleted", "success");
       }
       
-      // Remove from UI
-      setMessages(prev => prev.filter(m => m._id !== selectedMessage._id));
-    } else {
-      console.log("Deleting for me:", selectedMessage._id);
-      const response = await API.delete(`/chat/message/${selectedMessage._id}?forEveryone=false`);
-      console.log("Delete response:", response.data);
+      setShowDeleteModal(false);
+      setSelectedMessage(null);
+      setDeleteForEveryone(false);
+    } catch (error) {
+      console.error("Failed to delete message:", error);
       
-      // Remove from UI
-      setMessages(prev => prev.filter(m => m._id !== selectedMessage._id));
+      if (error.response?.status === 500 && 
+          error.response?.data?.message?.includes('Cast to ObjectId')) {
+        showToast("Cannot delete message that hasn't been sent yet", "warning");
+        setMessages(prev => prev.filter(m => m._id !== selectedMessage._id));
+      } else {
+        showToast(error.response?.data?.message || "Failed to delete message", "error");
+      }
+      
+      setShowDeleteModal(false);
+      setSelectedMessage(null);
     }
-    
-    setShowDeleteModal(false);
-    setSelectedMessage(null);
-    setDeleteForEveryone(false);
-  } catch (error) {
-    console.error("Failed to delete message:", error);
-    console.error("Error details:", error.response?.data);
-    alert(error.response?.data?.message || "Failed to delete message");
-  }
-};
+  };
 
   const handleClearChat = async () => {
     try {
       setClearing(true);
-      await API.delete(`/chat/clear/${matchId}`);
+      const response = await API.delete(`/chat/clear/${matchId}`);
+      console.log("✅ Clear chat response:", response.data);
       
       setMessages([]);
-      
-      if (socket && socket.connected) {
-        socket.emit('clear-chat', { matchId });
-      }
+      showToast("Chat cleared successfully", "success");
       
       setShowClearChatModal(false);
     } catch (error) {
-      console.error("Failed to clear chat:", error);
-      alert("Failed to clear chat");
+      console.error("❌ Failed to clear chat:", error);
+      showToast(error.response?.data?.message || "Failed to clear chat", "error");
     } finally {
       setClearing(false);
     }
@@ -367,7 +420,7 @@ const handleDeleteMessage = async () => {
 
   const handleReportUser = async () => {
     if (!reportReason.trim()) {
-      alert("Please provide a reason for reporting");
+      showToast("Please provide a reason for reporting", "warning");
       return;
     }
 
@@ -380,10 +433,10 @@ const handleDeleteMessage = async () => {
       
       setShowReportModal(false);
       setReportReason("");
-      alert("User reported successfully. Our team will review this.");
+      showToast("User reported successfully. Our team will review this.", "success");
     } catch (error) {
       console.error("Failed to report user:", error);
-      alert("Failed to report user");
+      showToast("Failed to report user", "error");
     } finally {
       setReporting(false);
     }
@@ -395,11 +448,11 @@ const handleDeleteMessage = async () => {
       await API.post(`/profile/block/${matchDetails?._id}`);
       
       setShowBlockModal(false);
-      alert("User blocked successfully. You will be redirected to matches.");
+      showToast("User blocked successfully", "success");
       navigate("/matches");
     } catch (error) {
       console.error("Failed to block user:", error);
-      alert("Failed to block user");
+      showToast("Failed to block user", "error");
     } finally {
       setBlocking(false);
     }
@@ -407,13 +460,11 @@ const handleDeleteMessage = async () => {
 
   const handleCopyMessage = (content) => {
     navigator.clipboard.writeText(content);
-    alert("Message copied to clipboard!");
-    setShowMessageOptions(null);
+    showToast("Message copied to clipboard!", "success");
   };
 
   const handleReplyToMessage = (message) => {
     setReplyingTo(message);
-    setShowMessageOptions(null);
     inputRef.current?.focus();
   };
 
@@ -473,10 +524,80 @@ const handleDeleteMessage = async () => {
     return groups;
   };
 
+  const handleImageError = (userId) => {
+    setImageErrors(prev => ({ ...prev, [userId]: true }));
+  };
+
+  // Toast Component
+  const ToastMessage = () => {
+    if (!toast) return null;
+    
+    const icons = {
+      success: <CheckCircle className="text-green-500" size={20} />,
+      error: <AlertCircle className="text-red-500" size={20} />,
+      warning: <AlertTriangle className="text-yellow-500" size={20} />,
+      info: <Info className="text-blue-500" size={20} />
+    };
+
+    const colors = {
+      success: "border-green-500 bg-green-50",
+      error: "border-red-500 bg-red-50",
+      warning: "border-yellow-500 bg-yellow-50",
+      info: "border-blue-500 bg-blue-50"
+    };
+
+    return (
+      <AnimatePresence>
+        <motion.div
+          key={toast.id}
+          initial={{ opacity: 0, y: -50 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -50 }}
+          className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-[1000] flex items-center gap-2 px-4 py-3 rounded-lg border-l-4 shadow-lg ${colors[toast.type]}`}
+        >
+          {icons[toast.type]}
+          <p className="text-sm font-medium text-gray-800">{toast.message}</p>
+        </motion.div>
+      </AnimatePresence>
+    );
+  };
+
+  // Mobile action buttons (touch optimized)
+  const MobileMessageActions = ({ msg, isMe }) => (
+    <div className="absolute -top-8 right-0 flex gap-1 bg-white rounded-full shadow-lg p-1 z-10">
+      <button
+        onClick={() => handleReplyToMessage(msg)}
+        className="p-2 hover:bg-gray-100 rounded-full transition"
+        title="Reply"
+      >
+        <Reply size={14} className="text-gray-600" />
+      </button>
+      <button
+        onClick={() => handleCopyMessage(msg.content)}
+        className="p-2 hover:bg-gray-100 rounded-full transition"
+        title="Copy"
+      >
+        <Copy size={14} className="text-gray-600" />
+      </button>
+      {isMe && !msg._id.toString().startsWith('temp-') && (
+        <button
+          onClick={() => {
+            setSelectedMessage(msg);
+            setShowDeleteModal(true);
+          }}
+          className="p-2 hover:bg-red-50 rounded-full transition"
+          title="Delete"
+        >
+          <Trash2 size={14} className="text-red-500" />
+        </button>
+      )}
+    </div>
+  );
+
   // Delete Modal
   const DeleteModal = () => (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-      <div className="bg-white rounded-2xl p-6 max-w-sm w-full animate-fadeIn">
+      <div className="bg-white rounded-2xl p-6 max-w-sm w-full animate-fadeIn mx-4">
         <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-50 flex items-center justify-center">
           <Trash2 size={32} className="text-red-500" />
         </div>
@@ -534,7 +655,7 @@ const handleDeleteMessage = async () => {
   // Report Modal
   const ReportModal = () => (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-      <div className="bg-white rounded-2xl p-6 max-w-md w-full animate-fadeIn">
+      <div className="bg-white rounded-2xl p-6 max-w-md w-full animate-fadeIn mx-4">
         <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-yellow-50 flex items-center justify-center">
           <Flag size={32} className="text-yellow-500" />
         </div>
@@ -573,7 +694,7 @@ const handleDeleteMessage = async () => {
   // Block Modal
   const BlockModal = () => (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-      <div className="bg-white rounded-2xl p-6 max-w-sm w-full animate-fadeIn">
+      <div className="bg-white rounded-2xl p-6 max-w-sm w-full animate-fadeIn mx-4">
         <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-50 flex items-center justify-center">
           <Ban size={32} className="text-red-500" />
         </div>
@@ -604,7 +725,7 @@ const handleDeleteMessage = async () => {
   // Clear Chat Modal
   const ClearChatModal = () => (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-      <div className="bg-white rounded-2xl p-6 max-w-sm w-full animate-fadeIn">
+      <div className="bg-white rounded-2xl p-6 max-w-sm w-full animate-fadeIn mx-4">
         <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-orange-50 flex items-center justify-center">
           <MessageSquare size={32} className="text-orange-500" />
         </div>
@@ -633,111 +754,118 @@ const handleDeleteMessage = async () => {
   );
 
   // Profile Modal
-// Profile Modal - Fixed Date Display
-const ProfileModal = () => {
-  // Format date safely
-  const formatJoinDate = (dateString) => {
-    if (!dateString) return 'Not available';
-    
-    try {
-      const date = new Date(dateString);
-      // Check if date is valid
-      if (isNaN(date.getTime())) {
+  const ProfileModal = () => {
+    const formatJoinDate = (dateString) => {
+      if (!dateString) return 'Not available';
+      
+      try {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) {
+          return 'Not available';
+        }
+        return date.toLocaleDateString('en-US', { 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        });
+      } catch (error) {
+        console.error("Date formatting error:", error);
         return 'Not available';
       }
-      return date.toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
-      });
-    } catch (error) {
-      console.error("Date formatting error:", error);
-      return 'Not available';
-    }
-  };
+    };
 
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-      <div className="bg-white rounded-3xl p-6 max-w-md w-full animate-fadeIn">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-xl font-bold text-gray-800">Profile</h3>
-          <button
-            onClick={() => setShowProfileModal(false)}
-            className="p-2 hover:bg-gray-100 rounded-full transition"
-          >
-            <X size={20} />
-          </button>
-        </div>
-        
-        <div className="text-center mb-6">
-          <div className="w-24 h-24 rounded-full bg-gradient-to-r from-pink-400 to-purple-500 flex items-center justify-center text-white font-bold text-4xl mx-auto mb-3 shadow-xl">
-            {matchDetails?.fullName?.charAt(0).toUpperCase()}
+    return (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+        <div className="bg-white rounded-3xl p-6 max-w-md w-full animate-fadeIn mx-4">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xl font-bold text-gray-800">Profile</h3>
+            <button
+              onClick={() => setShowProfileModal(false)}
+              className="p-2 hover:bg-gray-100 rounded-full transition"
+            >
+              <X size={20} />
+            </button>
           </div>
-          <h2 className="text-2xl font-bold text-gray-800">{matchDetails?.fullName}</h2>
-          <p className="text-gray-500 text-sm">{matchDetails?.email}</p>
-        </div>
-        
-        <div className="space-y-3">
-          {otherUserProfile?.bio && (
-            <div className="p-3 bg-gray-50 rounded-lg">
-              <p className="text-sm text-gray-600">{otherUserProfile.bio}</p>
-            </div>
-          )}
           
-          {otherUserProfile?.interests?.length > 0 && (
-            <div className="p-3 bg-gray-50 rounded-lg">
-              <h4 className="font-semibold text-gray-700 mb-2 text-sm">Interests</h4>
-              <div className="flex flex-wrap gap-2">
-                {otherUserProfile.interests.map((interest, i) => (
-                  <span key={i} className="px-3 py-1 bg-pink-100 text-pink-600 rounded-full text-xs">
-                    {interest}
-                  </span>
-                ))}
+          <div className="text-center mb-6">
+            <div className="w-24 h-24 rounded-full overflow-hidden mx-auto mb-3 shadow-xl">
+              {matchDetails?.profileImage && !imageErrors[matchDetails?._id] ? (
+                <img 
+                  src={matchDetails.profileImage} 
+                  alt={matchDetails.fullName}
+                  className="w-full h-full object-cover"
+                  onError={() => handleImageError(matchDetails?._id)}
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-r from-pink-400 to-purple-500 flex items-center justify-center text-white font-bold text-4xl">
+                  {matchDetails?.fullName?.charAt(0).toUpperCase()}
+                </div>
+              )}
+            </div>
+            <h2 className="text-2xl font-bold text-gray-800">{matchDetails?.fullName}</h2>
+            <p className="text-gray-500 text-sm">{matchDetails?.email}</p>
+          </div>
+          
+          <div className="space-y-3">
+            {otherUserProfile?.bio && (
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <p className="text-sm text-gray-600">{otherUserProfile.bio}</p>
               </div>
-            </div>
-          )}
-          
-          <div className="p-3 bg-gray-50 rounded-lg">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-600">College</span>
-              <span className="font-medium text-gray-800">
-                {otherUserProfile?.college?.name || 'Not specified'}
-              </span>
-            </div>
-          </div>
-          
-          <div className="p-3 bg-gray-50 rounded-lg">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-600">Member since</span>
-              <span className="font-medium text-gray-800">
-                {formatJoinDate(otherUserProfile?.createdAt)}
-              </span>
-            </div>
-          </div>
-
-          {/* Optional: Add more user info */}
-          {otherUserProfile?.gender && (
+            )}
+            
+            {otherUserProfile?.interests?.length > 0 && (
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <h4 className="font-semibold text-gray-700 mb-2 text-sm">Interests</h4>
+                <div className="flex flex-wrap gap-2">
+                  {otherUserProfile.interests.map((interest, i) => (
+                    <span key={i} className="px-3 py-1 bg-pink-100 text-pink-600 rounded-full text-xs">
+                      {interest}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            
             <div className="p-3 bg-gray-50 rounded-lg">
               <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">Gender</span>
-                <span className="font-medium text-gray-800 capitalize">{otherUserProfile.gender}</span>
+                <span className="text-gray-600">College</span>
+                <span className="font-medium text-gray-800">
+                  {otherUserProfile?.college?.name || 'Not specified'}
+                </span>
               </div>
             </div>
-          )}
-        </div>
-        
-        <div className="mt-6 flex gap-3">
-          <button
-            onClick={() => setShowProfileModal(false)}
-            className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition"
-          >
-            Close
-          </button>
+            
+            <div className="p-3 bg-gray-50 rounded-lg">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-600">Member since</span>
+                <span className="font-medium text-gray-800">
+                  {formatJoinDate(otherUserProfile?.createdAt)}
+                </span>
+              </div>
+            </div>
+
+            {otherUserProfile?.gender && (
+              <div className="p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Gender</span>
+                  <span className="font-medium text-gray-800 capitalize">{otherUserProfile.gender}</span>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <div className="mt-6 flex gap-3">
+            <button
+              onClick={() => setShowProfileModal(false)}
+              className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition"
+            >
+              Close
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
   if (loading) {
     return (
@@ -758,7 +886,10 @@ const ProfileModal = () => {
   const groupedMessages = groupMessagesByDate();
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)] bg-gradient-to-b from-gray-50 to-pink-50/30 rounded-xl overflow-hidden relative">
+    <div className="flex flex-col h-[100dvh] bg-gradient-to-b from-gray-50 to-pink-50/30 overflow-hidden">
+      {/* Toast Message */}
+      <ToastMessage />
+
       {/* Modals */}
       {showDeleteModal && <DeleteModal />}
       {showReportModal && <ReportModal />}
@@ -766,40 +897,53 @@ const ProfileModal = () => {
       {showClearChatModal && <ClearChatModal />}
       {showProfileModal && <ProfileModal />}
 
-      {/* Chat Header with Enhanced UI */}
-      <div className="bg-white/90 backdrop-blur-sm p-4 border-b flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-3">
+      {/* Chat Header - Mobile Optimized */}
+      <div className="bg-white/90 backdrop-blur-sm px-3 py-2 md:px-4 md:py-3 border-b flex items-center justify-between shadow-sm">
+        <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
           <button 
             onClick={() => navigate("/messages")}
-            className="p-2 hover:bg-gray-100 rounded-full transition group"
+            className="p-2 hover:bg-gray-100 rounded-full transition group flex-shrink-0"
           >
-            <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
+            <ArrowLeft size={isMobile ? 20 : 22} className="group-hover:-translate-x-1 transition-transform" />
           </button>
+          
           <div 
-            className="relative cursor-pointer"
+            className="relative cursor-pointer flex-shrink-0"
             onClick={() => setShowProfileModal(true)}
           >
-            <div className="w-12 h-12 rounded-full bg-gradient-to-r from-pink-400 to-purple-500 flex items-center justify-center text-white font-bold text-lg shadow-md">
-              {matchDetails?.fullName?.charAt(0).toUpperCase()}
+            <div className="w-10 h-10 md:w-12 md:h-12 rounded-full overflow-hidden shadow-md">
+              {matchDetails?.profileImage && !imageErrors[matchDetails?._id] ? (
+                <img 
+                  src={matchDetails.profileImage} 
+                  alt={matchDetails.fullName}
+                  className="w-full h-full object-cover"
+                  onError={() => handleImageError(matchDetails?._id)}
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-r from-pink-400 to-purple-500 flex items-center justify-center text-white font-bold text-base md:text-lg">
+                  {matchDetails?.fullName?.charAt(0).toUpperCase()}
+                </div>
+              )}
             </div>
-            <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-white"></div>
+            <div className="absolute bottom-0 right-0 w-2.5 h-2.5 md:w-3 md:h-3 bg-green-500 rounded-full border-2 border-white"></div>
           </div>
-          <div>
+          
+          <div className="min-w-0 flex-1">
             <h2 
-              className="font-semibold text-gray-800 cursor-pointer hover:text-pink-600 transition"
+              className="font-semibold text-gray-800 cursor-pointer hover:text-pink-600 transition truncate text-sm md:text-base"
               onClick={() => setShowProfileModal(true)}
             >
               {matchDetails?.fullName}
             </h2>
-            <p className="text-xs flex items-center gap-1">
+            <p className="text-[10px] md:text-xs flex items-center gap-1">
               {otherUserTyping ? (
                 <span className="text-pink-500 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 bg-pink-500 rounded-full animate-pulse"></span>
+                  <span className="w-1 h-1 md:w-1.5 md:h-1.5 bg-pink-500 rounded-full animate-pulse"></span>
                   Typing...
                 </span>
               ) : (
                 <span className="flex items-center gap-1 text-green-600">
-                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                  <span className="w-1 h-1 md:w-1.5 md:h-1.5 bg-green-500 rounded-full"></span>
                   Online
                 </span>
               )}
@@ -808,24 +952,24 @@ const ProfileModal = () => {
         </div>
         
         {/* Header Actions */}
-        <div className="relative">
+        <div className="relative flex-shrink-0">
           <button
             onClick={() => setShowOptions(!showOptions)}
             className="p-2 hover:bg-gray-100 rounded-full transition"
           >
-            <MoreVertical size={18} className="text-gray-600" />
+            <MoreVertical size={isMobile ? 20 : 22} className="text-gray-600" />
           </button>
           
           {showOptions && (
-            <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-10 animate-slideDown">
+            <div className="absolute right-0 mt-2 w-48 md:w-56 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-10 animate-slideDown">
               <button
                 onClick={() => {
                   setShowOptions(false);
                   setShowProfileModal(true);
                 }}
-                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                className="w-full px-3 md:px-4 py-2 text-left text-xs md:text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
               >
-                <User size={16} /> View Profile
+                <User size={14} /> View Profile
               </button>
               
               <button
@@ -833,9 +977,9 @@ const ProfileModal = () => {
                   setShowOptions(false);
                   setShowClearChatModal(true);
                 }}
-                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                className="w-full px-3 md:px-4 py-2 text-left text-xs md:text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
               >
-                <MessageSquare size={16} /> Clear Chat
+                <MessageSquare size={14} /> Clear Chat
               </button>
               
               <div className="border-t border-gray-100 my-1"></div>
@@ -845,9 +989,9 @@ const ProfileModal = () => {
                   setShowOptions(false);
                   setShowReportModal(true);
                 }}
-                className="w-full px-4 py-2 text-left text-sm text-yellow-600 hover:bg-yellow-50 flex items-center gap-2"
+                className="w-full px-3 md:px-4 py-2 text-left text-xs md:text-sm text-yellow-600 hover:bg-yellow-50 flex items-center gap-2"
               >
-                <Flag size={16} /> Report User
+                <Flag size={14} /> Report User
               </button>
               
               <button
@@ -855,22 +999,22 @@ const ProfileModal = () => {
                   setShowOptions(false);
                   setShowBlockModal(true);
                 }}
-                className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                className="w-full px-3 md:px-4 py-2 text-left text-xs md:text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
               >
-                <Ban size={16} /> Block User
+                <Ban size={14} /> Block User
               </button>
             </div>
           )}
         </div>
       </div>
 
-      {/* Messages Container */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[url('https://www.transparenttextures.com/patterns/white-paper.png')]">
+      {/* Messages Container - Scrollable */}
+      <div className="flex-1 overflow-y-auto px-2 md:px-4 py-3 space-y-3 md:space-y-4">
         {groupedMessages.map((item, index) => {
           if (item.type === 'date') {
             return (
               <div key={`date-${index}`} className="flex justify-center">
-                <span className="px-4 py-1.5 bg-white/80 backdrop-blur-sm rounded-full text-xs font-medium text-gray-600 shadow-sm">
+                <span className="px-3 py-1 md:px-4 md:py-1.5 bg-white/80 backdrop-blur-sm rounded-full text-[10px] md:text-xs font-medium text-gray-600 shadow-sm">
                   {item.date}
                 </span>
               </div>
@@ -885,90 +1029,101 @@ const ProfileModal = () => {
               key={msg._id || msg.tempId}
               className={`flex ${isMe ? 'justify-end' : 'justify-start'} group relative`}
             >
-{!isMe && (
-  <div 
-    className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-r from-pink-400 to-purple-500 flex items-center justify-center text-white font-bold text-sm mr-2 self-end mb-1 shadow-sm cursor-pointer"
-    onClick={() => setShowProfileModal(true)}
-  >
-    {matchDetails?.profileImage ? (
-      <img 
-        src={matchDetails.profileImage} 
-        alt={matchDetails.fullName}
-        className="w-full h-full object-cover"
-      />
-    ) : (
-      matchDetails?.fullName?.charAt(0).toUpperCase()
-    )}
-  </div>
-)}
+              {!isMe && (
+                <div 
+                  className="w-6 h-6 md:w-8 md:h-8 rounded-full overflow-hidden mr-1 md:mr-2 self-end mb-1 shadow-sm cursor-pointer flex-shrink-0"
+                  onClick={() => setShowProfileModal(true)}
+                >
+                  {matchDetails?.profileImage && !imageErrors[matchDetails?._id] ? (
+                    <img 
+                      src={matchDetails.profileImage} 
+                      alt={matchDetails.fullName}
+                      className="w-full h-full object-cover"
+                      onError={() => handleImageError(matchDetails?._id)}
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-r from-pink-400 to-purple-500 flex items-center justify-center text-white font-bold text-xs md:text-sm">
+                      {matchDetails?.fullName?.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+              )}
               
-              <div className="relative max-w-[70%]">
+              <div className="relative max-w-[75%] md:max-w-[70%]">
                 {/* Reply Indicator */}
                 {msg.replyTo && (
-                  <div className="mb-1 ml-2 text-xs text-gray-500 flex items-center gap-1">
-                    <CornerDownRight size={12} />
-                    <span>Replying to {msg.replyTo.sender === user?._id ? 'yourself' : matchDetails?.fullName}</span>
+                  <div className="mb-0.5 md:mb-1 ml-1 md:ml-2 text-[10px] md:text-xs text-gray-500 flex items-center gap-0.5 md:gap-1">
+                    <CornerDownRight size={10} />
+                    <span className="truncate max-w-[150px] md:max-w-[200px]">
+                      Replying to {msg.replyTo.sender === user?._id ? 'yourself' : matchDetails?.fullName}
+                    </span>
                   </div>
                 )}
                 
                 {/* Message Bubble */}
                 <div 
-                  className={`rounded-2xl p-3 ${
+                  className={`rounded-2xl p-2 md:p-3 ${
                     isMe
-                      ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-br-none shadow-lg shadow-pink-500/20'
-                      : 'bg-white text-gray-800 rounded-bl-none shadow-md'
+                      ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-br-none shadow-md'
+                      : 'bg-white text-gray-800 rounded-bl-none shadow-sm'
                   }`}
                 >
-                  <p className="break-words text-[15px] leading-relaxed">{msg.content}</p>
+                  <p className="break-words text-[13px] md:text-[15px] leading-relaxed">{msg.content}</p>
                   
                   {/* Message Footer */}
-                  <div className={`flex items-center justify-end gap-1 text-xs mt-1 ${
+                  <div className={`flex items-center justify-end gap-0.5 md:gap-1 text-[10px] md:text-xs mt-0.5 md:mt-1 ${
                     isMe ? 'text-pink-100' : 'text-gray-500'
                   }`}>
                     <span>{formatTime(msg.createdAt)}</span>
                     {isMe && (
-                      <span className="ml-1">
+                      <span className="ml-0.5">
                         {msg.seen ? (
-                          <div className="flex -space-x-1">
-                            <CheckCheck size={14} className="text-blue-300" />
-                          </div>
+                          <CheckCheck size={12} className="text-blue-300" />
                         ) : (
-                          <Check size={14} />
+                          <Check size={12} />
                         )}
                       </span>
                     )}
                   </div>
                 </div>
 
-                {/* Message Actions - Show on hover */}
-                <div className={`absolute ${isMe ? 'left-0 -translate-x-full' : 'right-0 translate-x-full'} top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 px-2`}>
-                  <button
-                    onClick={() => handleReplyToMessage(msg)}
-                    className="p-1.5 bg-white rounded-full shadow-md hover:bg-gray-50 transition"
-                    title="Reply"
-                  >
-                    <Reply size={14} className="text-gray-600" />
-                  </button>
-                  <button
-                    onClick={() => handleCopyMessage(msg.content)}
-                    className="p-1.5 bg-white rounded-full shadow-md hover:bg-gray-50 transition"
-                    title="Copy"
-                  >
-                    <Copy size={14} className="text-gray-600" />
-                  </button>
-                  {isMe && (
+                {/* Message Actions - Different for mobile/desktop */}
+                {isMobile ? (
+                  /* Mobile: Tap to show actions */
+                  <div className="absolute -top-8 right-0 opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity">
+                    <MobileMessageActions msg={msg} isMe={isMe} />
+                  </div>
+                ) : (
+                  /* Desktop: Hover actions */
+                  <div className={`absolute ${isMe ? 'left-0 -translate-x-full' : 'right-0 translate-x-full'} top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 px-2`}>
                     <button
-                      onClick={() => {
-                        setSelectedMessage(msg);
-                        setShowDeleteModal(true);
-                      }}
-                      className="p-1.5 bg-white rounded-full shadow-md hover:bg-red-50 transition"
-                      title="Delete"
+                      onClick={() => handleReplyToMessage(msg)}
+                      className="p-1.5 bg-white rounded-full shadow-md hover:bg-gray-50 transition"
+                      title="Reply"
                     >
-                      <Trash2 size={14} className="text-red-500" />
+                      <Reply size={14} className="text-gray-600" />
                     </button>
-                  )}
-                </div>
+                    <button
+                      onClick={() => handleCopyMessage(msg.content)}
+                      className="p-1.5 bg-white rounded-full shadow-md hover:bg-gray-50 transition"
+                      title="Copy"
+                    >
+                      <Copy size={14} className="text-gray-600" />
+                    </button>
+                    {isMe && !msg._id.toString().startsWith('temp-') && (
+                      <button
+                        onClick={() => {
+                          setSelectedMessage(msg);
+                          setShowDeleteModal(true);
+                        }}
+                        className="p-1.5 bg-white rounded-full shadow-md hover:bg-red-50 transition"
+                        title="Delete"
+                      >
+                        <Trash2 size={14} className="text-red-500" />
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -977,14 +1132,25 @@ const ProfileModal = () => {
         {/* Typing Indicator */}
         {otherUserTyping && (
           <div className="flex justify-start">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-r from-pink-400 to-purple-500 flex items-center justify-center text-white font-bold text-sm mr-2 shadow-sm">
-              {matchDetails?.fullName?.charAt(0).toUpperCase()}
+            <div className="w-6 h-6 md:w-8 md:h-8 rounded-full overflow-hidden mr-1 md:mr-2 shadow-sm flex-shrink-0">
+              {matchDetails?.profileImage && !imageErrors[matchDetails?._id] ? (
+                <img 
+                  src={matchDetails.profileImage} 
+                  alt={matchDetails.fullName}
+                  className="w-full h-full object-cover"
+                  onError={() => handleImageError(matchDetails?._id)}
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-r from-pink-400 to-purple-500 flex items-center justify-center text-white font-bold text-xs md:text-sm">
+                  {matchDetails?.fullName?.charAt(0).toUpperCase()}
+                </div>
+              )}
             </div>
-            <div className="bg-white rounded-2xl p-4 rounded-bl-none shadow-md">
-              <div className="flex gap-1.5">
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+            <div className="bg-white rounded-2xl p-3 md:p-4 rounded-bl-none shadow-sm">
+              <div className="flex gap-1 md:gap-1.5">
+                <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
               </div>
             </div>
           </div>
@@ -995,42 +1161,42 @@ const ProfileModal = () => {
 
       {/* Reply Indicator */}
       {replyingTo && (
-        <div className="bg-white/90 backdrop-blur-sm px-4 py-2 border-t flex items-center justify-between">
-          <div className="flex items-center gap-2 flex-1">
-            <CornerDownRight size={16} className="text-pink-500" />
-            <div className="flex-1">
-              <p className="text-xs text-pink-500 font-medium">Replying to {replyingTo.sender === user?._id ? 'yourself' : matchDetails?.fullName}</p>
-              <p className="text-sm text-gray-600 truncate">{replyingTo.content}</p>
+        <div className="bg-white/90 backdrop-blur-sm px-3 md:px-4 py-1.5 md:py-2 border-t flex items-center justify-between">
+          <div className="flex items-center gap-1 md:gap-2 flex-1 min-w-0">
+            <CornerDownRight size={14} className="text-pink-500 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] md:text-xs text-pink-500 font-medium">Replying to {replyingTo.sender === user?._id ? 'yourself' : matchDetails?.fullName}</p>
+              <p className="text-xs md:text-sm text-gray-600 truncate">{replyingTo.content}</p>
             </div>
           </div>
           <button
             onClick={() => setReplyingTo(null)}
-            className="p-1 hover:bg-gray-100 rounded-full transition"
+            className="p-1 hover:bg-gray-100 rounded-full transition flex-shrink-0"
           >
-            <X size={16} />
+            <X size={14} />
           </button>
         </div>
       )}
 
-      {/* Message Input */}
-      <div className="bg-white/90 backdrop-blur-sm p-4 border-t relative">
-        <form onSubmit={sendMessage} className="flex gap-2">
+      {/* Message Input - Mobile Optimized */}
+      <div className="bg-white/90 backdrop-blur-sm p-2 md:p-3 border-t relative">
+        <form onSubmit={sendMessage} className="flex gap-1 md:gap-2 items-center">
           <button 
             type="button" 
-            className="p-2 text-gray-400 hover:text-pink-500 transition-colors rounded-full hover:bg-gray-100"
+            className="p-2 text-gray-400 hover:text-pink-500 transition-colors rounded-full hover:bg-gray-100 flex-shrink-0"
           >
-            <Paperclip size={20} />
+            <Paperclip size={isMobile ? 18 : 20} />
           </button>
           
           <div className="relative" ref={emojiPickerRef}>
             <button
               type="button"
               onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              className={`p-2 transition-colors rounded-full hover:bg-gray-100 ${
+              className={`p-2 transition-colors rounded-full hover:bg-gray-100 flex-shrink-0 ${
                 showEmojiPicker ? 'text-pink-500 bg-gray-100' : 'text-gray-400 hover:text-pink-500'
               }`}
             >
-              <Smile size={20} />
+              <Smile size={isMobile ? 18 : 20} />
             </button>
             
             {showEmojiPicker && (
@@ -1039,8 +1205,8 @@ const ProfileModal = () => {
                   onEmojiClick={handleEmojiClick}
                   autoFocusSearch={false}
                   theme="light"
-                  width={320}
-                  height={400}
+                  width={isMobile ? 280 : 320}
+                  height={isMobile ? 350 : 400}
                 />
               </div>
             )}
@@ -1053,20 +1219,20 @@ const ProfileModal = () => {
               value={newMessage}
               onChange={handleTyping}
               placeholder={`Message ${matchDetails?.fullName}...`}
-              className="w-full px-4 py-2.5 rounded-full border border-gray-200 focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all bg-gray-50 focus:bg-white"
+              className="w-full px-3 md:px-4 py-2 md:py-2.5 text-sm md:text-base rounded-full border border-gray-200 focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-200 transition-all bg-gray-50 focus:bg-white"
             />
           </div>
           
           <button
             type="submit"
             disabled={!newMessage.trim()}
-            className={`p-2.5 rounded-full transition-all ${
+            className={`p-2 md:p-2.5 rounded-full transition-all flex-shrink-0 ${
               newMessage.trim() 
-                ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-pink-500/30 hover:opacity-90 hover:scale-105' 
+                ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg shadow-pink-500/30 hover:opacity-90 active:scale-95' 
                 : 'bg-gray-100 text-gray-400 cursor-not-allowed'
             }`}
           >
-            <Send size={18} />
+            <Send size={isMobile ? 16 : 18} />
           </button>
         </form>
       </div>
