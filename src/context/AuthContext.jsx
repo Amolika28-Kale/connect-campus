@@ -14,17 +14,31 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Format profile image URL
-  const formatProfileImage = (imagePath) => {
-    if (!imagePath) return null;
-    if (imagePath.startsWith('http')) return imagePath;
-    
-    const baseUrl = getBaseUrl();
-    if (imagePath.includes('uploads/')) {
-      const filename = imagePath.split('uploads/').pop();
-      return `${baseUrl}/uploads/${filename}`;
+// context/AuthContext.jsx - Update formatProfileImage function
+const formatProfileImage = (imagePath) => {
+  if (!imagePath) return null;
+  
+  // If it's already a full URL
+  if (imagePath.startsWith('http')) {
+    // Replace http with https for production
+    if (window.location.protocol === 'https:' && imagePath.startsWith('http://')) {
+      return imagePath.replace('http://', 'https://');
     }
-    return `${baseUrl}/uploads/profiles/${imagePath}`;
-  };
+    return imagePath;
+  }
+  
+  // Get base URL based on environment
+  const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'https://campus-backend-3axn.onrender.com';
+  
+  // Ensure HTTPS
+  const secureBaseUrl = baseUrl.replace('http://', 'https://');
+  
+  if (imagePath.includes('uploads/')) {
+    const filename = imagePath.split('uploads/').pop();
+    return `${secureBaseUrl}/uploads/${filename}`;
+  }
+  return `${secureBaseUrl}/uploads/profiles/${imagePath}`;
+};
 
   // Initialize auth state from localStorage
   useEffect(() => {

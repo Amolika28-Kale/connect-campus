@@ -210,24 +210,47 @@ const Settings = () => {
     });
   };
 
-  // Get profile image URL
-  const getProfileImageUrl = (imagePath) => {
-    if (!imagePath) return null;
-    
-    if (imagePath.startsWith('http')) {
-      return imagePath;
-    }
-    
-    if (imagePath.includes('uploads/')) {
-      const filename = imagePath.split('uploads/').pop();
-      return `https://campus-backend-3axn.onrender.com/uploads/${filename}`;
-            // return `http://localhost:5000/uploads/${filename}`;
+// pages/Settings.jsx - Fixed getProfileImageUrl function
 
+const getProfileImageUrl = (imagePath) => {
+  if (!imagePath) return null;
+  
+  console.log("🔧 Original image path:", imagePath);
+  
+  // If it's already a full URL
+  if (imagePath.startsWith('http')) {
+    // If we're in production (HTTPS) and image is HTTP, convert to HTTPS
+    if (window.location.protocol === 'https:' && imagePath.startsWith('http://')) {
+      // But don't convert localhost URLs - they should never be used in production
+      if (imagePath.includes('localhost')) {
+        console.log("⚠️ Found localhost URL in production, replacing with Render URL");
+        // Extract filename and use Render URL instead
+        const filename = imagePath.split('/').pop();
+        return `https://campus-backend-3axn.onrender.com/uploads/profiles/${filename}`;
+      }
+      return imagePath.replace('http://', 'https://');
     }
-    
-    return `https://campus-backend-3axn.onrender.com/uploads/profiles/${imagePath}`;
-    // return `http://localhost:5000/uploads/profiles/${imagePath}`;
-  };
+    return imagePath;
+  }
+  
+  // Base URL - ALWAYS use Render URL in production
+  const baseUrl = window.location.hostname === 'localhost' 
+    ? 'http://localhost:5000' 
+    : 'https://campus-backend-3axn.onrender.com';
+  
+  console.log("🏠 Environment:", window.location.hostname === 'localhost' ? 'Development' : 'Production');
+  console.log("📡 Using base URL:", baseUrl);
+  
+  // Handle different path formats
+  if (imagePath.includes('uploads/')) {
+    // Clean the path - remove any backslashes and get filename
+    const cleanPath = imagePath.replace(/\\/g, '/');
+    const filename = cleanPath.split('uploads/').pop();
+    return `${baseUrl}/uploads/${filename}`;
+  }
+  
+  return `${baseUrl}/uploads/profiles/${imagePath}`;
+};
 
   const tabs = [
     { id: "profile", label: "Profile", icon: User },

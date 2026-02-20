@@ -550,8 +550,8 @@ const Discovery = () => {
                 transition={{ type: "spring", stiffness: 300, damping: 25 }}
                 className="bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100"
               >
-                {/* Profile Image with Gradient Overlay */}
-{/* Profile Image */}
+
+{/* Profile Image with Gradient Overlay */}
 <div className="relative h-[500px]">
   {currentUser.profileImage ? (
     <img 
@@ -559,9 +559,9 @@ const Discovery = () => {
       alt={currentUser.fullName}
       className="w-full h-full object-cover"
       onError={(e) => {
-        e.target.onerror = null;
+        console.log("Image load error, using fallback");
         e.target.style.display = 'none';
-        // Show fallback
+        // Show fallback with user initial
         const parent = e.target.parentElement;
         const fallback = document.createElement('div');
         fallback.className = 'w-full h-full bg-gradient-to-br from-pink-100 via-purple-100 to-indigo-100 flex items-center justify-center';
@@ -577,8 +577,67 @@ const Discovery = () => {
     </div>
   )}
   
-  {/* Rest of the overlay code */}
+  {/* Gradient Overlay */}
+  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
+  
+  {/* Profile Info Overlay - Shows all details */}
+  <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
+    <h2 className="text-3xl font-bold mb-1">
+      {currentUser.fullName}, {currentUser.age || calculateAge(currentUser.dob)}
+    </h2>
+    <div className="flex items-center gap-2 text-white/90 text-sm mb-2">
+      <MapPin size={16} />
+      <span>{currentUser.college?.name || 'College not specified'}</span>
+    </div>
+    
+    {/* Additional Details */}
+    <div className="flex flex-wrap gap-2 mt-2">
+      {currentUser.gender && (
+        <div className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full text-xs">
+          {currentUser.gender}
+        </div>
+      )}
+      <div className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full text-xs">
+        {currentUser.interests?.length || 0} interests
+      </div>
+      {currentUser.bio && (
+        <div className="bg-white/20 backdrop-blur-sm px-3 py-1 rounded-full text-xs">
+          Has bio
+        </div>
+      )}
+    </div>
+  </div>
+
+  {/* Profile Counter */}
+  <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-sm px-3 py-1 rounded-full">
+    <span className="text-white text-sm font-medium">
+      {currentIndex + 1}/{users.length}
+    </span>
+  </div>
 </div>
+
+{currentUser.bio && (
+  <div className="mb-5">
+    <h3 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
+      <Info size={16} className="text-pink-500" />
+      About
+    </h3>
+    <p className="text-gray-600 leading-relaxed">{currentUser.bio}</p>
+  </div>
+)}
+
+{currentUser.college && !currentUser.college.name && (
+  <div className="mb-4">
+    <h3 className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
+      <GraduationCap size={16} className="text-pink-500" />
+      College
+    </h3>
+    <p className="text-gray-600">{currentUser.college.name}</p>
+    {currentUser.college.city && (
+      <p className="text-sm text-gray-500">{currentUser.college.city}</p>
+    )}
+  </div>
+)}
 
                 {/* Profile Details */}
                 <div className="p-6">

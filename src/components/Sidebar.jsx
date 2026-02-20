@@ -1,4 +1,4 @@
-// Sidebar.jsx - Fixed Profile Photo Display
+// Sidebar.jsx - Enhanced with Better Image Handling
 import { NavLink, useNavigate } from "react-router-dom";
 import { 
   Search, 
@@ -24,9 +24,9 @@ const Sidebar = () => {
   // Update profile image URL when user changes
   useEffect(() => {
     if (user?.profileImage) {
-      console.log("User profile image:", user.profileImage); // Debug log
+      console.log("👤 User profile image path:", user.profileImage);
       const url = getProfileImageUrl(user.profileImage);
-      console.log("Generated URL:", url); // Debug log
+      console.log("🖼️ Generated URL:", url);
       setProfileImageUrl(url);
       setImageError(false);
     } else {
@@ -91,30 +91,39 @@ const Sidebar = () => {
     navigate("/login");
   };
 
-  // Get profile image URL
+  // Get profile image URL with HTTPS support
   const getProfileImageUrl = (imagePath) => {
     if (!imagePath) return null;
     
-    console.log("Processing image path:", imagePath); // Debug log
+    console.log("🔧 Processing image path:", imagePath);
     
-    // If it's already a full URL (Cloudinary, etc.)
+    // If it's already a full URL
     if (imagePath.startsWith('http')) {
+      // Ensure HTTPS in production
+      if (window.location.protocol === 'https:' && imagePath.startsWith('http://')) {
+        return imagePath.replace('http://', 'https://');
+      }
       return imagePath;
     }
     
-    // If it's a local path with uploads/
+    // Base URL for production
+    const baseUrl = 'https://campus-backend-3axn.onrender.com';
+    
+    // Handle different path formats
     if (imagePath.includes('uploads/')) {
-      // Extract just the filename if it's a full path
-      const filename = imagePath.split('uploads/').pop();
-      // return `http://localhost:5000/uploads/${filename}`;
-            return `https://campus-backend-3axn.onrender.com/uploads/${filename}`;
-
+      // Clean the path - remove any backslashes and get filename
+      const cleanPath = imagePath.replace(/\\/g, '/');
+      const filename = cleanPath.split('uploads/').pop();
+      return `${baseUrl}/uploads/${filename}`;
     }
     
     // If it's just a filename
-    // return `http://localhost:5000/uploads/profiles/${imagePath}`;
-        return `https://campus-backend-3axn.onrender.com/uploads/profiles/${imagePath}`;
+    return `${baseUrl}/uploads/profiles/${imagePath}`;
+  };
 
+  // Get initials from name
+  const getInitials = (name) => {
+    return name?.charAt(0).toUpperCase() || '?';
   };
 
   // Logout Modal Component
@@ -161,49 +170,48 @@ const Sidebar = () => {
               <h1 className="text-2xl font-black bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">
                 PuneDate
               </h1>
-              <p className="text-xs text-gray-400">Find your Pune connection💕</p>
+              <p className="text-xs text-gray-400">Find your Pune connection 💕</p>
             </div>
           </div>
 
           {/* User Profile Card with Photo */}
-{/* User Profile Card with Photo */}
-{user && (
-  <div className="mb-6 p-4 bg-gradient-to-r from-pink-50 to-purple-50 rounded-2xl border border-pink-100 hover:shadow-lg transition-all group">
-    <div className="flex items-center gap-3">
-      <div className="relative">
-        <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-pink-300 group-hover:border-pink-500 transition-all shadow-md bg-gradient-to-r from-pink-100 to-purple-100">
-          {user.profileImage ? (
-            <img 
-              src={user.profileImage} 
-              alt={user.fullName}
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                console.log("Image load error, using fallback");
-                e.target.style.display = 'none';
-                e.target.parentElement.innerHTML = `<div class="w-full h-full bg-gradient-to-r from-pink-400 to-purple-500 flex items-center justify-center text-white font-bold text-xl">${user.fullName?.charAt(0).toUpperCase()}</div>`;
-              }}
-            />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-r from-pink-400 to-purple-500 flex items-center justify-center text-white font-bold text-xl">
-              {user.fullName?.charAt(0).toUpperCase()}
+          {user && (
+            <div className="mb-6 p-4 bg-gradient-to-r from-pink-50 to-purple-50 rounded-2xl border border-pink-100 hover:shadow-lg transition-all group">
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <div className="w-14 h-14 rounded-full overflow-hidden border-2 border-pink-300 group-hover:border-pink-500 transition-all shadow-md">
+                    {profileImageUrl && !imageError ? (
+                      <img 
+                        src={profileImageUrl} 
+                        alt={user.fullName}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          console.log("❌ Image load error for:", profileImageUrl);
+                          setImageError(true);
+                        }}
+                        onLoad={() => console.log("✅ Image loaded successfully:", profileImageUrl)}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-r from-pink-400 to-purple-500 flex items-center justify-center text-white font-bold text-xl">
+                        {getInitials(user.fullName)}
+                      </div>
+                    )}
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
+                </div>
+                
+                <div className="flex-1">
+                  <p className="font-semibold text-gray-800 group-hover:text-pink-600 transition-colors truncate">
+                    {user.fullName}
+                  </p>
+                  <p className="text-xs text-gray-500 flex items-center gap-1">
+                    <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                    Online
+                  </p>
+                </div>
+              </div>
             </div>
           )}
-        </div>
-        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
-      </div>
-      
-      <div className="flex-1">
-        <p className="font-semibold text-gray-800 group-hover:text-pink-600 transition-colors">
-          {user.fullName}
-        </p>
-        <p className="text-xs text-gray-500 flex items-center gap-1">
-          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-          Online
-        </p>
-      </div>
-    </div>
-  </div>
-)}
 
           {/* Navigation Links */}
           <nav className="space-y-2">
@@ -230,7 +238,7 @@ const Sidebar = () => {
                     
                     <div className="flex items-center gap-2">
                       {link.badge && (
-                        <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full min-w-[20px] text-center animate-pulse">
+                        <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full min-w-[22px] text-center animate-pulse">
                           {link.badge > 99 ? '99+' : link.badge}
                         </span>
                       )}
@@ -301,7 +309,6 @@ const Sidebar = () => {
         ))}
       </div>
 
-      
 
       {/* Logout Confirmation Modal */}
       {showLogoutModal && <LogoutModal />}

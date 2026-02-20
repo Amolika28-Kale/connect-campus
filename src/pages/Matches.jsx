@@ -1,4 +1,4 @@
-// pages/Matches.jsx - Enhanced UI with Full Mobile Responsiveness
+// pages/Matches.jsx - Enhanced with Profile Photos
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -20,7 +20,11 @@ import {
   Camera,
   Award,
   ChevronRight,
-  Menu
+  Menu,
+  User,
+  MapPin,
+  GraduationCap,
+  Info
 } from "lucide-react";
 
 const Matches = () => {
@@ -32,6 +36,7 @@ const Matches = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState(null);
   const [showUnmatchModal, setShowUnmatchModal] = useState(false);
+  const [imageErrors, setImageErrors] = useState({});
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -83,6 +88,32 @@ const Matches = () => {
     return name?.charAt(0).toUpperCase() || '?';
   };
 
+  // Get profile image URL with HTTPS support
+  const getProfileImageUrl = (imagePath) => {
+    if (!imagePath) return null;
+    
+    // If it's already a full URL
+    if (imagePath.startsWith('http')) {
+      // Ensure HTTPS in production
+      if (window.location.protocol === 'https:' && imagePath.startsWith('http://')) {
+        return imagePath.replace('http://', 'https://');
+      }
+      return imagePath;
+    }
+    
+    // Base URL for production
+    const baseUrl = 'https://campus-backend-3axn.onrender.com';
+    
+    // Handle different path formats
+    if (imagePath.includes('uploads/')) {
+      const cleanPath = imagePath.replace(/\\/g, '/');
+      const filename = cleanPath.split('uploads/').pop();
+      return `${baseUrl}/uploads/${filename}`;
+    }
+    
+    return `${baseUrl}/uploads/profiles/${imagePath}`;
+  };
+
   const getRandomGradient = (seed) => {
     const gradients = [
       'from-pink-400 to-rose-500',
@@ -107,6 +138,11 @@ const Matches = () => {
     if (diffDays === 1) return 'Yesterday';
     if (diffDays < 7) return `${diffDays} days ago`;
     return matchDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  // Handle image error
+  const handleImageError = (userId) => {
+    setImageErrors(prev => ({ ...prev, [userId]: true }));
   };
 
   // Unmatch Confirmation Modal
@@ -285,6 +321,8 @@ const Matches = () => {
               {sortedMatches.map((match) => {
                 const otherUser = match.users.find(u => u._id !== user?._id);
                 const gradient = getRandomGradient(otherUser?._id);
+                const profileImageUrl = getProfileImageUrl(otherUser?.profileImage);
+                const hasImageError = imageErrors[otherUser?._id];
                 
                 return (
                   <div 
@@ -299,11 +337,22 @@ const Matches = () => {
                         {formatDate(match.createdAt)}
                       </div>
                       
-                      {/* Avatar */}
+                      {/* Avatar with Profile Photo */}
                       <div className="absolute -bottom-10 left-4">
                         <div className="relative">
-                          <div className={`w-20 h-20 rounded-2xl bg-gradient-to-r ${gradient} flex items-center justify-center text-white font-bold text-3xl shadow-xl border-4 border-white transform group-hover:scale-105 transition-transform duration-300`}>
-                            {getInitials(otherUser?.fullName)}
+                          <div className="w-20 h-20 rounded-2xl overflow-hidden border-4 border-white shadow-xl transform group-hover:scale-105 transition-transform duration-300">
+                            {profileImageUrl && !hasImageError ? (
+                              <img 
+                                src={profileImageUrl} 
+                                alt={otherUser?.fullName}
+                                className="w-full h-full object-cover"
+                                onError={() => handleImageError(otherUser?._id)}
+                              />
+                            ) : (
+                              <div className={`w-full h-full bg-gradient-to-r ${gradient} flex items-center justify-center text-white font-bold text-3xl`}>
+                                {getInitials(otherUser?.fullName)}
+                              </div>
+                            )}
                           </div>
                           {/* Online Status */}
                           <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
@@ -323,8 +372,14 @@ const Matches = () => {
                           <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
                           Active now
                         </p>
+                        {otherUser?.college?.name && (
+                          <p className="text-xs text-gray-500 flex items-center gap-1">
+                            <GraduationCap size={12} className="text-pink-400" />
+                            {otherUser.college.name}
+                          </p>
+                        )}
                         {otherUser?.bio && (
-                          <p className="text-sm text-gray-600 line-clamp-2">{otherUser.bio}</p>
+                          <p className="text-sm text-gray-600 line-clamp-2 mt-2">{otherUser.bio}</p>
                         )}
                       </div>
 
@@ -378,6 +433,8 @@ const Matches = () => {
               {sortedMatches.map((match) => {
                 const otherUser = match.users.find(u => u._id !== user?._id);
                 const gradient = getRandomGradient(otherUser?._id);
+                const profileImageUrl = getProfileImageUrl(otherUser?.profileImage);
+                const hasImageError = imageErrors[otherUser?._id];
                 
                 return (
                   <div
@@ -386,10 +443,21 @@ const Matches = () => {
                     onClick={() => navigate(`/chat/${match._id}`)}
                   >
                     <div className="flex items-center gap-4 p-4">
-                      {/* Avatar */}
+                      {/* Avatar with Profile Photo */}
                       <div className="relative flex-shrink-0">
-                        <div className={`w-16 h-16 rounded-2xl bg-gradient-to-r ${gradient} flex items-center justify-center text-white font-bold text-2xl shadow-md transform group-hover:scale-105 transition-transform duration-300`}>
-                          {getInitials(otherUser?.fullName)}
+                        <div className="w-16 h-16 rounded-2xl overflow-hidden shadow-md transform group-hover:scale-105 transition-transform duration-300">
+                          {profileImageUrl && !hasImageError ? (
+                            <img 
+                              src={profileImageUrl} 
+                              alt={otherUser?.fullName}
+                              className="w-full h-full object-cover"
+                              onError={() => handleImageError(otherUser?._id)}
+                            />
+                          ) : (
+                            <div className={`w-full h-full bg-gradient-to-r ${gradient} flex items-center justify-center text-white font-bold text-2xl`}>
+                              {getInitials(otherUser?.fullName)}
+                            </div>
+                          )}
                         </div>
                         <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
                       </div>
@@ -405,6 +473,13 @@ const Matches = () => {
                             {formatDate(match.createdAt)}
                           </span>
                         </div>
+                        
+                        {otherUser?.college?.name && (
+                          <p className="text-xs text-gray-500 flex items-center gap-1 mb-1">
+                            <GraduationCap size={12} className="text-pink-400" />
+                            {otherUser.college.name}
+                          </p>
+                        )}
                         
                         <p className="text-sm text-gray-500 line-clamp-1 mb-2">
                           {otherUser?.bio || 'No bio yet'}
@@ -452,8 +527,6 @@ const Matches = () => {
           )}
         </>
       )}
-
-      
 
       {/* Quick Actions - Mobile */}
       <div className="md:hidden fixed bottom-20 right-4 flex flex-col gap-2 z-40">

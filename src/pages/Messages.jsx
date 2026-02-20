@@ -1,4 +1,4 @@
-// pages/Messages.jsx - Enhanced UI with Full Mobile Responsiveness
+// pages/Messages.jsx - Enhanced with Profile Photos
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -17,7 +17,8 @@ import {
   Star,
   Users,
   Sparkles,
-  X
+  X,
+  Camera
 } from "lucide-react";
 
 const Messages = () => {
@@ -29,6 +30,7 @@ const Messages = () => {
   const [showSearch, setShowSearch] = useState(false);
   const [filterUnread, setFilterUnread] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [imageErrors, setImageErrors] = useState({});
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -150,6 +152,32 @@ const Messages = () => {
     return name?.charAt(0).toUpperCase() || '?';
   };
 
+  // Get profile image URL with HTTPS support
+  const getProfileImageUrl = (imagePath) => {
+    if (!imagePath) return null;
+    
+    // If it's already a full URL
+    if (imagePath.startsWith('http')) {
+      // Ensure HTTPS in production
+      if (window.location.protocol === 'https:' && imagePath.startsWith('http://')) {
+        return imagePath.replace('http://', 'https://');
+      }
+      return imagePath;
+    }
+    
+    // Base URL for production
+    const baseUrl = 'https://campus-backend-3axn.onrender.com';
+    
+    // Handle different path formats
+    if (imagePath.includes('uploads/')) {
+      const cleanPath = imagePath.replace(/\\/g, '/');
+      const filename = cleanPath.split('uploads/').pop();
+      return `${baseUrl}/uploads/${filename}`;
+    }
+    
+    return `${baseUrl}/uploads/profiles/${imagePath}`;
+  };
+
   const getRandomGradient = (seed) => {
     const gradients = [
       'from-pink-400 to-purple-500',
@@ -161,6 +189,11 @@ const Messages = () => {
     ];
     const index = (seed?.charCodeAt(0) || 0) % gradients.length;
     return gradients[index];
+  };
+
+  // Handle image error
+  const handleImageError = (userId) => {
+    setImageErrors(prev => ({ ...prev, [userId]: true }));
   };
 
   if (loading) {
@@ -304,6 +337,8 @@ const Messages = () => {
             const lastMsg = details?.lastMsg;
             const unreadCount = details?.unreadCount || 0;
             const lastMsgStatus = details?.lastMsgStatus;
+            const profileImageUrl = getProfileImageUrl(otherUser?.profileImage);
+            const hasImageError = imageErrors[otherUser?._id];
             
             if (!otherUser) return null;
             
@@ -319,16 +354,27 @@ const Messages = () => {
                 )}
                 
                 <div className="flex items-center gap-4 p-4">
-                  {/* Avatar with Status */}
+                  {/* Avatar with Profile Photo */}
                   <div className="relative flex-shrink-0">
-                    <div className={`w-16 h-16 rounded-2xl bg-gradient-to-r ${getRandomGradient(otherUser?._id)} flex items-center justify-center text-white font-bold text-2xl shadow-md transform group-hover:scale-105 transition-transform duration-300`}>
-                      {getInitials(otherUser?.fullName)}
+                    <div className="w-16 h-16 rounded-2xl overflow-hidden shadow-md transform group-hover:scale-105 transition-transform duration-300">
+                      {profileImageUrl && !hasImageError ? (
+                        <img 
+                          src={profileImageUrl} 
+                          alt={otherUser?.fullName}
+                          className="w-full h-full object-cover"
+                          onError={() => handleImageError(otherUser?._id)}
+                        />
+                      ) : (
+                        <div className={`w-full h-full bg-gradient-to-r ${getRandomGradient(otherUser?._id)} flex items-center justify-center text-white font-bold text-2xl`}>
+                          {getInitials(otherUser?.fullName)}
+                        </div>
+                      )}
                     </div>
                     
                     {/* Online Status */}
                     <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
                     
-                    {/* Unread Badge - Desktop */}
+                    {/* Unread Badge - Mobile */}
                     {unreadCount > 0 && (
                       <div className="absolute -top-1 -right-1 md:hidden">
                         {unreadCount === 1 ? (
@@ -400,7 +446,6 @@ const Messages = () => {
 
                     {/* Message Stats (for mobile) */}
                     <div className="flex items-center gap-3 mt-2 md:hidden">
-                    
                       {unreadCount > 0 && (
                         <span className="text-xs text-green-500 flex items-center gap-1">
                           <Circle size={8} className="fill-green-500" />
@@ -425,8 +470,6 @@ const Messages = () => {
         </div>
       )}
 
-     
-
       {/* Quick Actions - Mobile */}
       <div className="md:hidden fixed bottom-20 right-4 flex flex-col gap-2 z-40">
         <button
@@ -436,7 +479,6 @@ const Messages = () => {
           <Sparkles size={20} />
         </button>
       </div>
-
     </div>
   );
 };
